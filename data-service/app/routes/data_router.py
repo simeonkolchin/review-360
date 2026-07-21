@@ -190,6 +190,18 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
     return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
 
 
+@router.get("/users/ids", dependencies=[Depends(require_service_token)])
+async def known_user_ids(session: AsyncSession = Depends(get_session)):
+    """Everyone the system has ever seen, anywhere.
+
+    Telegram will not list a group's members, but it will answer "is this
+    person in that chat?" — so the ids we already know are the one lead we have
+    for filling a roster without waiting for people to write.
+    """
+    ids = list(await session.scalars(select(TgUser.telegram_id)))
+    return {"telegram_ids": ids}
+
+
 @router.post("/chats/migrate", dependencies=[Depends(require_service_token)])
 async def migrate_chat(payload: dict, session: AsyncSession = Depends(get_session)):
     """Follow a group that Telegram upgraded to a supergroup.

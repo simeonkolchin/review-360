@@ -116,19 +116,76 @@ async def chat_status(chat_id: int) -> dict:
     return status
 
 
+MEMBER_STATUSES = {"creator", "administrator", "member", "restricted"}
+
+
+async def sync_members(chat_id: int, chat_title: str, candidate_ids: list[int]) -> int:
+    """Record everyone Telegram confirms is in this chat.
+
+    Two sources, both of which the Bot API does allow: the admin list in full,
+    and a membership check for each person we already know from anywhere else.
+    Returns how many people were written.
+    """
+    from app.services import data_client  # local import keeps the module import-light
+
+    async def remember(user: dict, is_admin: bool) -> bool:
+        if user.get("is_bot"):
+            return False
+        photo = None
+        photos = await _call(
+            "getUserProfilePhotos", {"user_id": user["id"], "limit": 1}
+        )
+        sizes = (photos or {}).get("photos") or []
+        if sizes:
+            file = await _call("getFile", {"file_id": sizes[0][-1]["file_id"]})
+            if file and file.get("file_path"):
+                photo = f"tg:{file['file_path']}"
+        await data_client.post("/enroll", json={
+            "telegram_chat_id": chat_id,
+            "chat_title": chat_title,
+            "telegram_id": user["id"],
+            "username": user.get("username"),
+            "first_name": user.get("first_name"),
+            "last_name": user.get("last_name"),
+            "photo_url": photo,
+            "is_admin": is_admin,
+        })
+        return True
+
+    seen: set[int] = set()
+    written = 0
+
+    for admin in await _call("getChatAdministrators", {"chat_id": chat_id}) or []:
+        user = admin.get("user", {})
+        seen.add(user.get("id"))
+        if await remember(user, is_admin=True):
+            written += 1
+
+    for candidate in candidate_ids:
+        if candidate in seen:
+            continue
+        membership = await _call(
+            "getChatMember", {"chat_id": chat_id, "user_id": candidate}
+        )
+        if not membership or membership.get("status") not in MEMBER_STATUSES:
+            continue
+        if await remember(membership.get("user", {}), is_admin=False):
+            written += 1
+
+    return written
+
+
 async def leave_chat(chat_id: int) -> bool:
-    """Make the bot leave a group — called when the chat is deleted from the site."""
-    if not TELEGRAM_BOT_TOKEN:
-        return False
-    try:
-        async with httpx.AsyncClient(timeout=10.0, proxy=TELEGRAM_PROXY or None) as client:
-            response = await client.post(
-                f"{API_BASE}/bot{TELEGRAM_BOT_TOKEN}/leaveChat", json={"chat_id": chat_id}
-            )
-        return response.status_code < 400
-    except Exception as exc:
-        logger.warning("leaveChat error: %s", exc)
-        return False
+    """Make the bot leave a group — called when the chat is deleted from the site.
+
+    Follows a supergroup migration: a stored id can be the retired one, and
+    leaving the dead chat would silently leave the bot sitting in the live one.
+    """
+    data = await _api("leaveChat", {"chat_id": chat_id})
+    moved = migration_target(data)
+    if moved:
+        data = await _api("leaveChat", {"chat_id": moved})
+    return bool(data and data.get("ok"))
 
 
 async def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> bool:
@@ -145,15 +202,12 @@ async def send_message(chat_id: int, text: str, reply_markup: dict | None = None
     if reply_markup:
         payload["reply_markup"] = reply_markup
 
-    try:
-        async with httpx.AsyncClient(timeout=10.0, proxy=TELEGRAM_PROXY or None) as client:
-            response = await client.post(
-                f"{API_BASE}/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json=payload
-            )
-        if response.status_code >= 400:
-            logger.error("sendMessage failed: %s %s", response.status_code, response.text[:300])
-            return False
-        return True
-    except Exception as exc:
-        logger.error("sendMessage error: %s", exc)
+    data = await _api("sendMessage", payload)
+    moved = migration_target(data)
+    if moved:
+        payload["chat_id"] = moved
+        data = await _api("sendMessage", payload)
+    if not (data and data.get("ok")):
+        logger.error("sendMessage failed: %s", (data or {}).get("description"))
         return False
+    return True

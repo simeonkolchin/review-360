@@ -9,6 +9,7 @@ from app.services import data_client
 from app.services.security import get_current_user_id
 from app.services.telegram import (
     chat_status,
+    sync_members,
     deep_link,
     fetch_file,
     leave_chat as telegram_leave,
@@ -111,6 +112,40 @@ async def chat_telegram_status(chat_id: int, telegram_id: int = Depends(get_curr
         "known": chat["member_count"],
         "member_count": info["member_count"],
         "bot_is_admin": info["bot_is_admin"],
+    }
+
+
+@router.post("/chats/{chat_id}/sync", summary="Re-read who is in the group")
+async def sync_chat_members(chat_id: int, telegram_id: int = Depends(get_current_user_id)):
+    """Pull in everyone Telegram will confirm is a member.
+
+    There is no "list members" call, but `getChatMember` answers for a person we
+    can name — so we ask about every id the system already knows. Combined with
+    the admin list that recovers most of a roster without waiting for people to
+    post something.
+    """
+    chats = await data_client.get("/chats", params={"telegram_id": telegram_id})
+    chat = next((c for c in chats if c["id"] == chat_id), None)
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+
+    target = chat["telegram_chat_id"]
+    info = await chat_status(target)
+    if info.get("migrate_to"):
+        await data_client.post("/chats/migrate", json={
+            "from_chat_id": target, "to_chat_id": info["migrate_to"],
+        })
+        target = info["migrate_to"]
+        info = await chat_status(target)
+
+    known = await data_client.get("/users/ids")
+    added = await sync_members(target, chat["title"], known.get("telegram_ids", []))
+
+    await data_client.record_event("chat_synced", telegram_id, chat_id=chat_id, added=added)
+    return {
+        "added": added,
+        "member_count": info.get("member_count"),
+        "bot_is_admin": info.get("bot_is_admin"),
     }
 
 

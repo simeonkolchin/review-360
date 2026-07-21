@@ -73,6 +73,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /users/ids:
+    get:
+      tags:
+      - Data
+      summary: Known User Ids
+      description: 'Everyone the system has ever seen, anywhere.
+
+
+        Telegram will not list a group''s members, but it will answer "is this
+
+        person in that chat?" — so the ids we already know are the one lead we have
+
+        for filling a roster without waiting for people to write.'
+      operationId: known_user_ids_users_ids_get
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats/migrate:
     post:
       tags:

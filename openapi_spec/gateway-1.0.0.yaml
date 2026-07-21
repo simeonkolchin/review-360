@@ -374,6 +374,50 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/sync:
+    post:
+      tags:
+      - API
+      summary: Re-read who is in the group
+      description: 'Pull in everyone Telegram will confirm is a member.
+
+
+        There is no "list members" call, but `getChatMember` answers for a person
+        we
+
+        can name — so we ask about every id the system already knows. Combined with
+
+        the admin list that recovers most of a roster without waiting for people to
+
+        post something.'
+      operationId: sync_chat_members_chats__chat_id__sync_post
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats/{chat_id}/questionnaire:
     get:
       tags:

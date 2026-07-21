@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
-  MoreVertical, LogOut, AlertTriangle, ShieldAlert,
+  MoreVertical, LogOut, AlertTriangle, ShieldAlert, RefreshCw, Loader2,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
 import { useLive } from '../api/live'
@@ -43,6 +43,8 @@ export default function ChatDetail() {
   const [confirmStart, setConfirmStart] = useState<Team | null>(null)
   const [confirmDeleteChat, setConfirmDeleteChat] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [syncing, setSyncing] = useState(false)
+  const [syncNote, setSyncNote] = useState<string | null>(null)
   const [chatQuestions, setChatQuestions] = useState(false)
   const [teamQuestions, setTeamQuestions] = useState<Team | null>(null)
 
@@ -87,6 +89,22 @@ export default function ChatDetail() {
     setConfirmDelete(null)
     await api.del(`/teams/${team.id}`)
     loadTeams()
+  }
+
+  const syncMembers = async () => {
+    setSyncing(true); setSyncNote(null)
+    try {
+      const r = await api.post<{ added: number; member_count: number | null }>(
+        `/chats/${chatId}/sync`,
+      )
+      await live.refresh()
+      tgLive.refresh()
+      setSyncNote(
+        r.member_count && r.added < r.member_count
+          ? `Найдено ${r.added} из ${r.member_count} — остальных Telegram не раскрывает, пока они не напишут`
+          : `Найдено ${r.added}`,
+      )
+    } catch (e) { setSyncNote((e as Error).message) } finally { setSyncing(false) }
   }
 
   const removeChat = async () => {
@@ -167,11 +185,17 @@ export default function ChatDetail() {
             <h3 className="text-[15px] m-0 flex items-center gap-2">
               <Users className="w-4 h-4 text-[var(--color-muted)]" /> Участники
             </h3>
-            <Pill>{available.length}</Pill>
+            <div className="flex items-center gap-2">
+              <Pill>{available.length}</Pill>
+              <button className="btn btn-ghost p-2" onClick={syncMembers} disabled={syncing}
+                      title="Проверить, кто сейчас в группе">
+                {syncing ? <Loader2 className="w-3.5 h-3.5 spin" />
+                         : <RefreshCw className="w-3.5 h-3.5" />}
+              </button>
+            </div>
           </div>
           <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-4">
-            Подтягиваются из чата автоматически. Перетащите в команду справа — или
-            просто нажмите на карточку
+            {syncNote ?? 'Подтягиваются из чата автоматически. Перетащите в команду справа — или просто нажмите на карточку'}
           </p>
 
           <div className="scroll-slim flex flex-col gap-2 max-h-[420px] overflow-auto pr-1">

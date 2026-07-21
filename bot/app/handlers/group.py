@@ -73,7 +73,10 @@ async def _sync_admins(bot: Bot, chat) -> int:
         return 0
     count = 0
     for member in admins:
-        avatar = await get_avatar_url(bot, member.user.id) if not member.user.is_bot else None
+        # The bot is an admin of its own group — it is not a participant.
+        if member.user.is_bot:
+            continue
+        avatar = await get_avatar_url(bot, member.user.id)
         if await gateway.enroll(
             chat.id, chat.title or "Группа", member.user,
             is_admin=True, photo_url=avatar, chat_photo_url=chat_photo,
