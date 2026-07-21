@@ -7,7 +7,7 @@ import {
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team } from '../api/client'
 import { useLive } from '../api/live'
-import { Avatar, ChatAvatar, ChatCover, EmptyState, Pill } from '../components/ui'
+import { Avatar, ChatAvatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
 import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
 
@@ -96,52 +96,49 @@ export default function ChatDetail() {
 
   return (
     <div>
-      <Link to="/" className="btn btn-ghost px-3 py-2 mb-4 no-underline inline-flex">
-        <ArrowLeft className="w-4 h-4" /> Обзор
-      </Link>
+      <div className="flex items-center gap-3 mb-5">
+        <Link to="/" className="btn btn-ghost px-3 py-2 no-underline inline-flex shrink-0">
+          <ArrowLeft className="w-4 h-4" /> Обзор
+        </Link>
 
-      {/* chat identity banner */}
-      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] mb-6">
-        <ChatCover url={chat?.photo_url} />
-        <div className="relative flex items-center gap-4 p-5">
-          <ChatAvatar name={chat?.title ?? '…'} url={chat?.photo_url} size={64} ring />
-          <div className="min-w-0 flex-1">
-            <h1 className="text-[22px] m-0 tracking-tight truncate">{chat?.title ?? 'Чат'}</h1>
-            <div className="flex items-center gap-2 mt-1.5 text-[12.5px] text-[var(--color-muted)]">
-              <Pill>{members.length} участник(ов)</Pill>
-              <Pill tone="accent">{teams.length} команд(ы)</Pill>
-              {unassigned.length > 0 && (
-                <span className="flex items-center gap-1.5 text-[var(--color-warning)]">
-                  <UserCircle2 className="w-3.5 h-3.5" /> {unassigned.length} без команды
-                </span>
-              )}
-            </div>
-          </div>
+        <div className="flex-1" />
 
-          <button className="btn btn-ghost px-3 py-2" onClick={() => setChatQuestions(true)}>
-            <SlidersHorizontal className="w-4 h-4" /> Опросник чата
+        <div className="flex items-center gap-2.5 min-w-0">
+          <ChatAvatar name={chat?.title ?? '…'} url={chat?.photo_url} size={32} />
+          <span className="text-[15px] truncate">{chat?.title ?? 'Чат'}</span>
+          {unassigned.length > 0 && (
+            <span className="flex items-center gap-1.5 text-[12px] text-[var(--color-warning)] shrink-0"
+                  title="Участники, которых ещё нет ни в одной команде">
+              <UserCircle2 className="w-3.5 h-3.5" /> {unassigned.length} без команды
+            </span>
+          )}
+        </div>
+
+        <div className="flex-1" />
+
+        <button className="btn btn-ghost px-3 py-2 shrink-0" onClick={() => setChatQuestions(true)}>
+          <SlidersHorizontal className="w-4 h-4" /> Опросник чата
+        </button>
+
+        <div className="relative shrink-0">
+          <button className="btn btn-ghost p-2.5" onClick={() => setMenuOpen(o => !o)} aria-label="Ещё">
+            <MoreVertical className="w-4 h-4" />
           </button>
-
-          <div className="relative">
-            <button className="btn btn-ghost p-2.5" onClick={() => setMenuOpen(o => !o)} aria-label="Ещё">
-              <MoreVertical className="w-4 h-4" />
-            </button>
-            {menuOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
-                <div className="absolute right-0 top-11 z-20 w-[230px] p-1.5 rounded-xl
-                                border border-[var(--color-border)] shadow-xl"
-                     style={{ background: 'var(--color-surface-elevated)' }}>
-                  <button
-                    onClick={() => { setMenuOpen(false); setConfirmDeleteChat(true) }}
-                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-[13.5px]
-                               text-[var(--color-danger)] hover:bg-[rgba(255,77,94,.1)] transition">
-                    <LogOut className="w-4 h-4" /> Удалить чат и выйти из группы
-                  </button>
-                </div>
-              </>
-            )}
-          </div>
+          {menuOpen && (
+            <>
+              <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+              <div className="absolute right-0 top-11 z-20 w-[230px] p-1.5 rounded-xl
+                              border border-[var(--color-border)] shadow-xl"
+                   style={{ background: 'var(--color-surface-elevated)' }}>
+                <button
+                  onClick={() => { setMenuOpen(false); setConfirmDeleteChat(true) }}
+                  className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-[13.5px]
+                             text-[var(--color-danger)] hover:bg-[rgba(255,77,94,.1)] transition">
+                  <LogOut className="w-4 h-4" /> Удалить чат и выйти из группы
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

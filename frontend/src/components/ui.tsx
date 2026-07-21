@@ -100,26 +100,3 @@ export function ChatAvatar({ name, url, size = 44, ring = false }: {
     </span>
   )
 }
-
-/** Blurred, dimmed band of the chat photo — a banner behind the title, or the top of a card. */
-export function ChatCover({ url, height }: { url?: string | null; height?: number }) {
-  const src = avatarSrc(url)
-  const box = height ? { height } : undefined
-  const cls = height ? 'relative w-full' : 'absolute inset-0'
-  if (!src) {
-    return (
-      <div className={cls} style={{
-        ...box,
-        background: 'linear-gradient(120deg, rgba(59,130,246,.14), rgba(99,102,241,.06) 60%, transparent)',
-      }} />
-    )
-  }
-  return (
-    <div className={cls} style={box}>
-      <img src={src} alt="" referrerPolicy="no-referrer" aria-hidden
-           className="absolute inset-0 w-full h-full object-cover"
-           style={{ filter: 'blur(40px)', transform: 'scale(1.2)', opacity: 0.4 }} />
-      <div className="absolute inset-0" style={{ background: 'rgba(19,19,22,.66)' }} />
-    </div>
-  )
-}
