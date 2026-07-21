@@ -3,10 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
+  MoreVertical, LogOut, AlertTriangle, UserCircle2,
 } from 'lucide-react'
-import { api, type Member, type Team } from '../api/client'
+import { api, type Chat, type Member, type Team } from '../api/client'
 import { useLive } from '../api/live'
-import { Avatar, EmptyState, Pill } from '../components/ui'
+import { Avatar, ChatAvatar, ChatCover, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
 import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
 
@@ -18,8 +19,10 @@ export default function ChatDetail() {
   // finishing their review shows up here without anyone pressing reload.
   const live = useLive<Member[]>(chatId ? `/chats/${chatId}/members` : null, 5000)
   const teamsLive = useLive<Team[]>(chatId ? `/chats/${chatId}/teams` : null, 5000)
+  const chatsLive = useLive<Chat[]>('/chats', 15000)
   const members = live.data ?? []
   const teams = teamsLive.data ?? []
+  const chat = chatsLive.data?.find(c => String(c.id) === chatId)
   const loading = live.loading
 
   // team builder
@@ -34,6 +37,8 @@ export default function ChatDetail() {
   // modals & panels
   const [confirmDelete, setConfirmDelete] = useState<Team | null>(null)
   const [confirmStart, setConfirmStart] = useState<Team | null>(null)
+  const [confirmDeleteChat, setConfirmDeleteChat] = useState(false)
+  const [menuOpen, setMenuOpen] = useState(false)
   const [chatQuestions, setChatQuestions] = useState(false)
   const [teamQuestions, setTeamQuestions] = useState<Team | null>(null)
 
@@ -49,6 +54,10 @@ export default function ChatDetail() {
   const chosen = picked
     .map(id => members.find(m => m.telegram_id === id))
     .filter((m): m is Member => Boolean(m))
+
+  // Who is not on any team yet — the people worth nudging into one.
+  const assigned = new Set(teams.flatMap(t => t.members.map(m => m.telegram_id)))
+  const unassigned = members.filter(m => !assigned.has(m.telegram_id))
 
   const create = async () => {
     setError(null); setBusy(true)
@@ -77,16 +86,63 @@ export default function ChatDetail() {
     loadTeams()
   }
 
+  const removeChat = async () => {
+    setConfirmDeleteChat(false)
+    try {
+      await api.del(`/chats/${chatId}`)
+      navigate('/')
+    } catch (e) { setError((e as Error).message) }
+  }
+
   return (
     <div>
-      <div className="flex items-center gap-2 mb-5">
-        <Link to="/" className="btn btn-ghost px-3 py-2 no-underline inline-flex">
-          <ArrowLeft className="w-4 h-4" /> Обзор
-        </Link>
-        <div className="flex-1" />
-        <button className="btn btn-ghost px-3 py-2" onClick={() => setChatQuestions(true)}>
-          <SlidersHorizontal className="w-4 h-4" /> Опросник чата
-        </button>
+      <Link to="/" className="btn btn-ghost px-3 py-2 mb-4 no-underline inline-flex">
+        <ArrowLeft className="w-4 h-4" /> Обзор
+      </Link>
+
+      {/* chat identity banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-[var(--color-border)] mb-6">
+        <ChatCover url={chat?.photo_url} />
+        <div className="relative flex items-center gap-4 p-5">
+          <ChatAvatar name={chat?.title ?? '…'} url={chat?.photo_url} size={64} ring />
+          <div className="min-w-0 flex-1">
+            <h1 className="text-[22px] m-0 tracking-tight truncate">{chat?.title ?? 'Чат'}</h1>
+            <div className="flex items-center gap-2 mt-1.5 text-[12.5px] text-[var(--color-muted)]">
+              <Pill>{members.length} участник(ов)</Pill>
+              <Pill tone="accent">{teams.length} команд(ы)</Pill>
+              {unassigned.length > 0 && (
+                <span className="flex items-center gap-1.5 text-[var(--color-warning)]">
+                  <UserCircle2 className="w-3.5 h-3.5" /> {unassigned.length} без команды
+                </span>
+              )}
+            </div>
+          </div>
+
+          <button className="btn btn-ghost px-3 py-2" onClick={() => setChatQuestions(true)}>
+            <SlidersHorizontal className="w-4 h-4" /> Опросник чата
+          </button>
+
+          <div className="relative">
+            <button className="btn btn-ghost p-2.5" onClick={() => setMenuOpen(o => !o)} aria-label="Ещё">
+              <MoreVertical className="w-4 h-4" />
+            </button>
+            {menuOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setMenuOpen(false)} />
+                <div className="absolute right-0 top-11 z-20 w-[230px] p-1.5 rounded-xl
+                                border border-[var(--color-border)] shadow-xl"
+                     style={{ background: 'var(--color-surface-elevated)' }}>
+                  <button
+                    onClick={() => { setMenuOpen(false); setConfirmDeleteChat(true) }}
+                    className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-lg text-left text-[13.5px]
+                               text-[var(--color-danger)] hover:bg-[rgba(255,77,94,.1)] transition">
+                    <LogOut className="w-4 h-4" /> Удалить чат и выйти из группы
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ---------------- team builder ---------------- */}
@@ -132,7 +188,13 @@ export default function ChatDetail() {
                 <GripVertical className="w-4 h-4 text-[var(--color-muted)] shrink-0" />
                 <Avatar name={m.display_name} url={m.photo_url} size={30} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] truncate">{m.display_name}</div>
+                  <div className="text-[13.5px] truncate flex items-center gap-1.5">
+                    {m.display_name}
+                    {!assigned.has(m.telegram_id) && (
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] shrink-0"
+                            title="Ещё не в команде" />
+                    )}
+                  </div>
                   <div className="text-[11.5px] text-[var(--color-muted)] truncate">
                     {m.username ? '@' + m.username : 'без username'}
                     {m.can_dm ? '' : ' · не открыл бота'}
@@ -158,7 +220,8 @@ export default function ChatDetail() {
             <Sparkles className="w-4 h-4 text-[var(--color-accent)]" /> Новая команда
           </h3>
           <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-4">
-            Минимум два человека. Корона отмечает лидера — его взгляд показываем отдельной строкой.
+            Минимум два человека. Корона отмечает лидера — его взгляд показываем отдельно.
+            Один человек может вести несколько команд.
           </p>
 
           <input className="input" placeholder="Название команды, например «Продукт»"
@@ -347,6 +410,35 @@ export default function ChatDetail() {
           </>
         }
       />
+
+      <Modal
+        open={confirmDeleteChat}
+        onClose={() => setConfirmDeleteChat(false)}
+        title={`Удалить «${chat?.title ?? 'чат'}»?`}
+        subtitle="Бот выйдет из группы, а все команды, раунды, ответы и настройки этого чата будут удалены безвозвратно."
+        footer={
+          <>
+            <button className="btn btn-ghost px-4 py-2.5" onClick={() => setConfirmDeleteChat(false)}>
+              Отмена
+            </button>
+            <button className="btn btn-ghost px-4 py-2.5"
+                    style={{ color: 'var(--color-danger)', borderColor: 'var(--color-danger)' }}
+                    onClick={removeChat}>
+              <LogOut className="w-4 h-4" /> Удалить и выйти
+            </button>
+          </>
+        }>
+        <div className="flex gap-2.5 items-start text-[13px] text-[var(--color-text-secondary)]
+                        rounded-xl border p-3.5"
+             style={{ borderColor: 'rgba(255,77,94,.3)', background: 'rgba(255,77,94,.06)' }}>
+          <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--color-danger)]" />
+          <span>
+            {teams.length > 0
+              ? `В чате ${teams.length} команд(ы) и вся история их оценок — это тоже удалится.`
+              : 'Восстановить данные будет нельзя. Бота придётся добавлять в группу заново.'}
+          </span>
+        </div>
+      </Modal>
 
       <QuestionnaireDrawer
         open={chatQuestions}

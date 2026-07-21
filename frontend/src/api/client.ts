@@ -27,7 +27,7 @@ export const api = {
 
 export interface User { telegram_id: number; username: string | null; display_name: string; photo_url: string | null }
 export interface Member extends User { can_dm: boolean; is_admin: boolean }
-export interface Chat { id: number; telegram_chat_id: number; title: string; member_count: number; team_count: number }
+export interface Chat { id: number; telegram_chat_id: number; title: string; photo_url: string | null; member_count: number; team_count: number }
 export interface Team { id: number; name: string; leader: User | null; members: User[]; active_round_id: number | null }
 export interface Question { id: number | null; name: string; description: string | null }
 export interface Questionnaire {

@@ -71,3 +71,55 @@ export function ScoreBar({ label, self, peer }: { label: string; self: number | 
     </div>
   )
 }
+
+/** Resolve the bot's "tg:<path>" avatar marker to the gateway proxy URL. */
+export function avatarSrc(url?: string | null): string | undefined {
+  if (!url) return undefined
+  return url.startsWith('tg:') ? `/api/avatar/${url.slice(3)}` : url
+}
+
+/** Square, rounded chat avatar — the group photo, or its initials on the accent gradient. */
+export function ChatAvatar({ name, url, size = 44, ring = false }: {
+  name: string; url?: string | null; size?: number; ring?: boolean
+}) {
+  const src = avatarSrc(url)
+  const ringCls = ring ? 'ring-2 ring-[var(--color-surface)]' : ''
+  if (src) {
+    return (
+      <img src={src} alt={name} referrerPolicy="no-referrer"
+        className={`rounded-2xl object-cover shrink-0 ${ringCls}`}
+        style={{ width: size, height: size }} />
+    )
+  }
+  const initials = (name || '?').trim().replace(/[«»]/g, '').split(/\s+/)
+    .map(w => w[0]).slice(0, 2).join('').toUpperCase()
+  return (
+    <span className={`grid place-items-center rounded-2xl font-semibold text-white shrink-0 ${ringCls}`}
+          style={{ width: size, height: size, fontSize: size * 0.36, background: 'var(--gradient-accent)' }}>
+      {initials}
+    </span>
+  )
+}
+
+/** Blurred, dimmed band of the chat photo — a banner behind the title, or the top of a card. */
+export function ChatCover({ url, height }: { url?: string | null; height?: number }) {
+  const src = avatarSrc(url)
+  const box = height ? { height } : undefined
+  const cls = height ? 'relative w-full' : 'absolute inset-0'
+  if (!src) {
+    return (
+      <div className={cls} style={{
+        ...box,
+        background: 'linear-gradient(120deg, rgba(59,130,246,.14), rgba(99,102,241,.06) 60%, transparent)',
+      }} />
+    )
+  }
+  return (
+    <div className={cls} style={box}>
+      <img src={src} alt="" referrerPolicy="no-referrer" aria-hidden
+           className="absolute inset-0 w-full h-full object-cover"
+           style={{ filter: 'blur(40px)', transform: 'scale(1.2)', opacity: 0.4 }} />
+      <div className="absolute inset-0" style={{ background: 'rgba(19,19,22,.66)' }} />
+    </div>
+  )
+}

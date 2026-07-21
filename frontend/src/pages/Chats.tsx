@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { Users, Layers, MessagesSquare, Plus, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
 import { api, type Chat } from '../api/client'
 import { useAuthConfig, botLink } from '../api/config'
-import { Pill } from '../components/ui'
+import { Pill, ChatAvatar, ChatCover } from '../components/ui'
 import Scramble from '../components/Scramble'
 
 interface Stats { counts: Record<string, number> }
@@ -130,12 +130,16 @@ export default function Chats() {
         <div className="grid gap-4 stagger" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))' }}>
           {chats.map((chat, i) => (
             <Link key={chat.id} to={`/chats/${chat.id}`}
-              className="card dotted p-5 no-underline text-[var(--color-text)] lift"
+              className="card no-underline text-[var(--color-text)] lift overflow-hidden"
               style={{ animationDelay: `${i * 60}ms` }}>
-              <h3 className="text-[15px] m-0 mb-3">{chat.title}</h3>
-              <div className="flex gap-2">
-                <Pill><Users className="w-3 h-3" /> {chat.member_count}</Pill>
-                <Pill tone="accent"><Layers className="w-3 h-3" /> {chat.team_count}</Pill>
+              <ChatCover url={chat.photo_url} height={64} />
+              <div className="relative px-5 pb-5 -mt-7">
+                <ChatAvatar name={chat.title} url={chat.photo_url} size={52} ring />
+                <h3 className="text-[15px] m-0 mt-3 mb-3 truncate">{chat.title}</h3>
+                <div className="flex gap-2">
+                  <Pill><Users className="w-3 h-3" /> {chat.member_count}</Pill>
+                  <Pill tone="accent"><Layers className="w-3 h-3" /> {chat.team_count}</Pill>
+                </div>
               </div>
             </Link>
           ))}

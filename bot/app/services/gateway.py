@@ -29,13 +29,15 @@ async def _request(method: str, path: str, **kwargs):
 
 
 async def enroll(chat_id: int, chat_title: str, user, can_dm: bool = False,
-                 is_admin: bool = False, photo_url: str | None = None):
+                 is_admin: bool = False, photo_url: str | None = None,
+                 chat_photo_url: str | None = None):
     return await _request(
         "POST",
         "/bot/enroll",
         json={
             "telegram_chat_id": chat_id,
             "chat_title": chat_title,
+            "chat_photo_url": chat_photo_url,
             "telegram_id": user.id,
             "username": user.username,
             "first_name": user.first_name,

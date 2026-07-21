@@ -62,6 +62,7 @@ class Chat(Base):
     id: Mapped[int] = mapped_column(primary_key=True)
     telegram_chat_id: Mapped[int] = mapped_column(BigInteger, unique=True, index=True)
     title: Mapped[str] = mapped_column(String(255))
+    photo_url: Mapped[str | None] = mapped_column(Text, nullable=True)
     added_by_id: Mapped[int | None] = mapped_column(ForeignKey("tg_users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 

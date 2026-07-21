@@ -45,6 +45,21 @@ async def fetch_file(file_path: str) -> tuple[bytes, str] | None:
         return None
 
 
+async def leave_chat(chat_id: int) -> bool:
+    """Make the bot leave a group — called when the chat is deleted from the site."""
+    if not TELEGRAM_BOT_TOKEN:
+        return False
+    try:
+        async with httpx.AsyncClient(timeout=10.0, proxy=TELEGRAM_PROXY or None) as client:
+            response = await client.post(
+                f"{API_BASE}/bot{TELEGRAM_BOT_TOKEN}/leaveChat", json={"chat_id": chat_id}
+            )
+        return response.status_code < 400
+    except Exception as exc:
+        logger.warning("leaveChat error: %s", exc)
+        return False
+
+
 async def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> bool:
     if not TELEGRAM_BOT_TOKEN:
         logger.warning("TELEGRAM_BOT_TOKEN not set — skipping sendMessage to %s", chat_id)

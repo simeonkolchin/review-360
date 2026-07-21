@@ -7,7 +7,13 @@ from fastapi import APIRouter, Depends, HTTPException, Response, status
 from app.schemas.requests import QuestionnaireRequest, TeamCreateRequest
 from app.services import data_client
 from app.services.security import get_current_user_id
-from app.services.telegram import deep_link, fetch_file, mention, send_message
+from app.services.telegram import (
+    deep_link,
+    fetch_file,
+    leave_chat as telegram_leave,
+    mention,
+    send_message,
+)
 
 router = APIRouter()
 
@@ -134,6 +140,24 @@ async def save_team_questionnaire(
 async def reset_team_questionnaire(team_id: int, telegram_id: int = Depends(get_current_user_id)):
     result = await data_client.delete(f"/teams/{team_id}/questionnaire")
     await data_client.record_event("questionnaire_reset", telegram_id, team_id=team_id)
+    return result
+
+
+@router.delete("/chats/{chat_id}", summary="Delete a chat and leave the group")
+async def delete_chat(chat_id: int, telegram_id: int = Depends(get_current_user_id)):
+    """Wipe everything for a chat, then make the bot leave the Telegram group.
+
+    Deletion happens first: if the bot cannot leave (already removed, network
+    blip) the data is gone regardless, which is what the user asked for.
+    """
+    result = await data_client.delete(
+        f"/chats/{chat_id}", params={"telegram_id": telegram_id}
+    )
+    if result.get("telegram_chat_id"):
+        await telegram_leave(result["telegram_chat_id"])
+    await data_client.record_event(
+        "chat_deleted", telegram_id, chat_id=chat_id, teams=result.get("teams", 0)
+    )
     return result
 
 

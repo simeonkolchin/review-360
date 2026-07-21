@@ -175,6 +175,20 @@ def main() -> int:
     )
     check("team with 1 member is rejected", status == 400, f"status={status}")
 
+    # The same person may lead more than one team — a real situation, not an error.
+    status, second = client.call(
+        "POST",
+        f"/chats/{chat['id']}/teams",
+        {
+            "name": "Вторая",
+            "leader_telegram_id": PEOPLE[0][0],
+            "member_telegram_ids": [PEOPLE[0][0], PEOPLE[1][0]],
+        },
+    )
+    check("same person can lead a second team", status == 201, f"status={status} {second}")
+    if status == 201:
+        client.call("DELETE", f"/teams/{second['id']}")  # keep the rest of the flow clean
+
     print("\n5b. Questionnaires: chat template and per-team override")
     status, base = client.call("GET", f"/chats/{chat['id']}/questionnaire")
     # "default" on a clean database, "chat" when the suite is re-run against a
@@ -345,6 +359,15 @@ def main() -> int:
         expected = round_["total_assignments"] * len(round_["competencies"])
         check("responses stored", stats["counts"]["responses"] >= expected,
               f"got={stats['counts']['responses']} expected>={expected}")
+
+    print("\n11. Deleting the chat wipes everything")
+    status, deleted = client.call("DELETE", f"/chats/{chat['id']}")
+    check("chat deleted", status == 200 and deleted.get("deleted"), f"status={status} {deleted}")
+    status, chats_after = client.call("GET", "/chats")
+    gone = status == 200 and not any(c["id"] == chat["id"] for c in chats_after)
+    check("chat no longer listed", gone, f"status={status}")
+    status, _ = client.call("GET", f"/rounds/{round_['id']}")
+    check("its rounds are gone too", status == 404, f"status={status}")
 
     print(f"\n{'-' * 46}")
     print(f"  {OK}passed: {passed}{RESET}   {ERR if failed else DIM}failed: {failed}{RESET}")

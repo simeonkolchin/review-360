@@ -574,6 +574,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}:
+    delete:
+      tags:
+      - API
+      summary: Delete a chat and leave the group
+      description: 'Wipe everything for a chat, then make the bot leave the Telegram
+        group.
+
+
+        Deletion happens first: if the bot cannot leave (already removed, network
+
+        blip) the data is gone regardless, which is what the user asked for.'
+      operationId: delete_chat_chats__chat_id__delete
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /teams/{team_id}:
     delete:
       tags:

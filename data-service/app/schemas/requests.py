@@ -45,6 +45,7 @@ class EnrollRequest(BaseModel):
 
     telegram_chat_id: int
     chat_title: str
+    chat_photo_url: str | None = None
     telegram_id: int
     username: str | None = None
     first_name: str | None = None

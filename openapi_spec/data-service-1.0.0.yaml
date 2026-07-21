@@ -73,6 +73,52 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}:
+    delete:
+      tags:
+      - Data
+      summary: Delete Chat
+      description: 'Erase a chat and everything collected in it.
+
+
+        Teams, rounds, assignments, answers, comments, memberships and the chat''s
+
+        own questionnaire all go — cascades handle most of it, questionnaires are
+
+        removed explicitly because they hang off teams that are about to vanish.'
+      operationId: delete_chat_chats__chat_id__delete
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /leave:
     post:
       tags:
@@ -1045,6 +1091,11 @@ components:
         title:
           type: string
           title: Title
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
         member_count:
           type: integer
           title: Member Count
@@ -1121,6 +1172,11 @@ components:
         chat_title:
           type: string
           title: Chat Title
+        chat_photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Chat Photo Url
         telegram_id:
           type: integer
           title: Telegram Id

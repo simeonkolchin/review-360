@@ -22,6 +22,7 @@ class ChatResponse(BaseModel):
     id: int
     telegram_chat_id: int
     title: str
+    photo_url: str | None = None
     member_count: int
     team_count: int
 

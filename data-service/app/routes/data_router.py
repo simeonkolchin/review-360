@@ -5,7 +5,7 @@ import secrets
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import SCORE_MAX, SCORE_MIN, SERVICE_TOKEN
@@ -163,12 +163,15 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
         chat = Chat(
             telegram_chat_id=payload.telegram_chat_id,
             title=payload.chat_title,
+            photo_url=payload.chat_photo_url,
             added_by_id=user.id,
         )
         session.add(chat)
         await session.flush()
     elif payload.chat_title:
         chat.title = payload.chat_title
+    if payload.chat_photo_url is not None:
+        chat.photo_url = payload.chat_photo_url
 
     membership = await session.scalar(
         select(Membership).where(
@@ -185,6 +188,28 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
 
     await session.commit()
     return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
+
+
+@router.delete("/chats/{chat_id}", dependencies=[Depends(require_service_token)])
+async def delete_chat(chat_id: int, telegram_id: int, session: AsyncSession = Depends(get_session)):
+    """Erase a chat and everything collected in it.
+
+    Teams, rounds, assignments, answers, comments, memberships and the chat's
+    own questionnaire all go — cascades handle most of it, questionnaires are
+    removed explicitly because they hang off teams that are about to vanish.
+    """
+    chat = await _get_chat_for_user(session, chat_id, telegram_id)
+    telegram_chat_id = chat.telegram_chat_id
+    team_ids = [t.id for t in chat.teams]
+
+    if team_ids:
+        await session.execute(
+            delete(Competency).where(Competency.team_id.in_(team_ids))
+        )
+    await session.execute(delete(Competency).where(Competency.chat_id == chat.id))
+    await session.delete(chat)
+    await session.commit()
+    return {"deleted": True, "telegram_chat_id": telegram_chat_id, "teams": len(team_ids)}
 
 
 @router.post("/leave", dependencies=[Depends(require_service_token)])
@@ -243,6 +268,7 @@ async def list_chats(telegram_id: int, session: AsyncSession = Depends(get_sessi
             id=c.id,
             telegram_chat_id=c.telegram_chat_id,
             title=c.title,
+            photo_url=c.photo_url,
             member_count=len(c.memberships),
             team_count=len(c.teams),
         )

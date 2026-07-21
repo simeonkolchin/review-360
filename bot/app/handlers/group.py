@@ -20,7 +20,7 @@ from aiogram.filters import Command
 from aiogram.types import ChatMemberUpdated, Message
 
 from app.services import gateway
-from app.services.photos import get_avatar_url
+from app.services.photos import get_avatar_url, get_chat_photo
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -60,7 +60,12 @@ async def _remember(bot: Bot, chat, user, *, is_admin: bool = False, with_photo:
 
 
 async def _sync_admins(bot: Bot, chat) -> int:
-    """Pull the full admin list — the only roster Telegram hands over."""
+    """Pull the full admin list — the only roster Telegram hands over.
+
+    Also refreshes the group's own photo, so the chat card on the site picks it
+    up the moment the bot has a reason to look.
+    """
+    chat_photo = await get_chat_photo(bot, chat.id)
     try:
         admins = await bot.get_chat_administrators(chat.id)
     except Exception as exc:
@@ -68,7 +73,11 @@ async def _sync_admins(bot: Bot, chat) -> int:
         return 0
     count = 0
     for member in admins:
-        if await _remember(bot, chat, member.user, is_admin=True, with_photo=True):
+        avatar = await get_avatar_url(bot, member.user.id) if not member.user.is_bot else None
+        if await gateway.enroll(
+            chat.id, chat.title or "Группа", member.user,
+            is_admin=True, photo_url=avatar, chat_photo_url=chat_photo,
+        ):
             count += 1
     return count
 

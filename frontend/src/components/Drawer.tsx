@@ -35,11 +35,11 @@ export default function Drawer({
   if (!open) return null
 
   return createPortal(
-    <div className="scrim !p-0 !place-items-stretch"
-         onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <div className="drawer ml-auto flex flex-col" style={{ width: `min(${width}px, 100%)` }}
+    <div className="drawer-scrim" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div className="drawer" style={{ width: `min(${width}px, 100%)` }}
            role="dialog" aria-modal="true" aria-label={title}>
-        <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b border-[var(--color-border)]">
+        <div className="flex items-start justify-between gap-4 p-6 pb-4 border-b
+                        border-[var(--color-border)] shrink-0">
           <div>
             <h3 className="text-[17px] m-0 tracking-tight">{title}</h3>
             {subtitle && (
@@ -51,10 +51,10 @@ export default function Drawer({
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">{children}</div>
+        <div className="drawer-body p-6">{children}</div>
 
         {footer && (
-          <div className="flex items-center gap-2 p-5 border-t border-[var(--color-border)]">
+          <div className="flex items-center gap-2 p-5 border-t border-[var(--color-border)] shrink-0">
             {footer}
           </div>
         )}

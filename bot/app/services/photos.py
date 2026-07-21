@@ -15,6 +15,23 @@ from aiogram import Bot
 logger = logging.getLogger(__name__)
 
 
+async def get_chat_photo(bot: Bot, chat_id: int) -> str | None:
+    """A group's photo as a `tg:<path>` reference the gateway can serve.
+
+    Same token-safety dance as user avatars: the download URL embeds the bot
+    token, so we store only the path and let the gateway stream the bytes.
+    """
+    try:
+        chat = await bot.get_chat(chat_id)
+        if not chat.photo:
+            return None
+        file = await bot.get_file(chat.photo.small_file_id)
+        return f"tg:{file.file_path}" if file.file_path else None
+    except Exception as exc:
+        logger.debug("no chat photo for %s: %s", chat_id, exc)
+        return None
+
+
 async def get_avatar_file_id(bot: Bot, telegram_id: int) -> str | None:
     """`file_id` of the person's newest profile photo.
 
