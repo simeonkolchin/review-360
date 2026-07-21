@@ -5,6 +5,7 @@ from app import (
     COOKIE_SECURE,
     DEV_LOGIN_ENABLED,
     JWT_TTL_HOURS,
+    MIN_RESPONSES_FOR_RESULTS,
     TELEGRAM_BOT_USERNAME,
 )
 from app.schemas.requests import DevLoginRequest, TelegramAuthRequest
@@ -32,7 +33,11 @@ def _set_cookie(response: Response, token: str) -> None:
 
 @router.get("/config", summary="Public auth configuration for the frontend")
 async def auth_config():
-    return {"bot_username": TELEGRAM_BOT_USERNAME, "dev_login_enabled": DEV_LOGIN_ENABLED}
+    return {
+        "bot_username": TELEGRAM_BOT_USERNAME,
+        "dev_login_enabled": DEV_LOGIN_ENABLED,
+        "min_responses_for_results": MIN_RESPONSES_FOR_RESULTS,
+    }
 
 
 @router.post("/telegram", response_model=UserResponse, summary="Login via Telegram Login Widget")

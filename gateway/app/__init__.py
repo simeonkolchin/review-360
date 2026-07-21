@@ -40,6 +40,11 @@ TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
 TELEGRAM_PROXY = os.getenv("TELEGRAM_PROXY", "").strip()
 
 
+# Peer averages stay hidden below this many answers — the UI warns about it
+# before a round starts, so nobody discovers it after everyone has voted.
+MIN_RESPONSES_FOR_RESULTS = _env_int("MIN_RESPONSES_FOR_RESULTS", 3)
+
+
 # Auth
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")

@@ -4,13 +4,15 @@ import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
   MoreVertical, LogOut, AlertTriangle, ShieldAlert, RefreshCw, Loader2, UserX, Plus,
+  Pencil,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
 import { useLive } from '../api/live'
-import { useAuthConfig, botLink } from '../api/config'
+import { useAuthConfig, botLink, peerCounts } from '../api/config'
 import { Avatar, ChatAvatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
 import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
+import TeamEditDrawer from '../components/TeamEditDrawer'
 
 export default function ChatDetail() {
   const { chatId } = useParams()
@@ -28,6 +30,13 @@ export default function ChatDetail() {
   const config = useAuthConfig()
   // Same invite link as the dashboard, admin rights requested up front.
   const inviteBack = botLink(config?.bot_username ?? '', '?startgroup=true&admin=invite_users')
+  const minAnswers = config?.min_responses_for_results ?? 3
+
+  /** Will team averages actually be shown, or hidden to protect anonymity? */
+  const anonymityCheck = (team: Team) => {
+    const { lowest, member, leader } = peerCounts(team.members.length, !!team.leader)
+    return { lowest, member, leader, ok: lowest >= minAnswers }
+  }
   const members = live.data ?? []
   const teams = teamsLive.data ?? []
   const chat = chatsLive.data?.find(c => String(c.id) === chatId)
@@ -51,6 +60,7 @@ export default function ChatDetail() {
   const [syncNote, setSyncNote] = useState<string | null>(null)
   const [chatQuestions, setChatQuestions] = useState(false)
   const [teamQuestions, setTeamQuestions] = useState<Team | null>(null)
+  const [editTeam, setEditTeam] = useState<Team | null>(null)
 
   const loadTeams = teamsLive.refresh
 
@@ -383,7 +393,13 @@ export default function ChatDetail() {
             <div key={team.id} className="card dotted p-5 lift">
               <div className="flex items-start justify-between gap-2 mb-3">
                 <h4 className="text-[15px] m-0">{team.name}</h4>
-                {team.active_round_id && <Pill tone="warn">идёт оценка</Pill>}
+                {team.active_round_id
+                  ? <Pill tone="warn">идёт оценка</Pill>
+                  : !anonymityCheck(team).ok && (
+                      <span title={`Средние по коллегам появляются от ${minAnswers} ответов — в такой команде их не будет`}>
+                        <Pill tone="warn">мало людей</Pill>
+                      </span>
+                    )}
               </div>
 
               <div className="text-[12.5px] text-[var(--color-muted)] mb-3 flex items-center gap-1.5">
@@ -418,6 +434,10 @@ export default function ChatDetail() {
                     <Play className="w-4 h-4" /> Запустить
                   </button>
                 )}
+                <button className="btn btn-ghost px-3 py-2" title="Изменить состав команды"
+                        onClick={() => setEditTeam(team)}>
+                  <Pencil className="w-4 h-4" />
+                </button>
                 <button className="btn btn-ghost px-3 py-2" title="Опросник этой команды"
                         onClick={() => setTeamQuestions(team)}>
                   <ListChecks className="w-4 h-4" />
@@ -449,6 +469,32 @@ export default function ChatDetail() {
             </button>
           </>
         }>
+        {confirmStart && !anonymityCheck(confirmStart).ok && (
+          <div className="flex gap-2.5 items-start text-[13px] leading-relaxed rounded-xl p-3.5 mb-3"
+               style={{ borderWidth: 1, borderStyle: 'solid',
+                        borderColor: 'rgba(255,176,32,.35)', background: 'rgba(255,176,32,.07)' }}>
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-[var(--color-warning)]" />
+            <div>
+              <b>Средние по команде не посчитаются.</b> В команде
+              {' '}{confirmStart.members.length} человек(а), поэтому каждого оценят
+              {' '}{anonymityCheck(confirmStart).member === anonymityCheck(confirmStart).leader
+                    ? anonymityCheck(confirmStart).member
+                    : `${anonymityCheck(confirmStart).member}–${anonymityCheck(confirmStart).leader}`}
+              {' '}коллег(и), а средние показываются от {minAnswers} ответов.
+              <div className="text-[12.5px] text-[var(--color-muted)] mt-1.5">
+                Это защита анонимности: по одному-двум ответам автора вычислить
+                тривиально. Самооценки и оценка лидера будут видны, средние по
+                коллегам — нет. Нужно {minAnswers + (confirmStart.leader ? 2 : 1)}
+                {' '}человек(а) в команде.
+              </div>
+              <button className="btn btn-ghost px-3 py-2 mt-3"
+                      onClick={() => { const t = confirmStart; setConfirmStart(null); setEditTeam(t) }}>
+                <UserPlus className="w-4 h-4" /> Добавить людей в команду
+              </button>
+            </div>
+          </div>
+        )}
+
         <div className="rounded-xl bg-[var(--color-surface-2)] border border-[var(--color-border)] p-4">
           <div className="text-[12.5px] text-[var(--color-muted)] mb-2.5">Кого позовём</div>
           <div className="flex flex-wrap gap-2">
@@ -511,6 +557,14 @@ export default function ChatDetail() {
           </span>
         </div>
       </Modal>
+
+      <TeamEditDrawer
+        open={!!editTeam}
+        onClose={() => setEditTeam(null)}
+        team={editTeam}
+        members={members}
+        onSaved={loadTeams}
+      />
 
       <QuestionnaireDrawer
         open={chatQuestions}

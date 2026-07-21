@@ -438,6 +438,61 @@ async def create_team(
     return _team_to_schema(await _reload(session, Team, team.id))
 
 
+@router.put(
+    "/teams/{team_id}",
+    response_model=TeamResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def update_team(
+    team_id: int,
+    telegram_id: int,
+    payload: TeamCreateRequest,
+    session: AsyncSession = Depends(get_session),
+):
+    """Rename a team, change its leader, add or remove people.
+
+    Membership is frozen while a round is running: the assignments were built
+    from the roster as it stood, and quietly changing it would leave half the
+    answers pointing at people who are no longer being reviewed.
+    """
+    team = await session.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Team not found")
+    chat = await _get_chat_for_user(session, team.chat_id, telegram_id)
+
+    allowed = {m.tg_user.telegram_id: m.tg_user for m in chat.memberships}
+    unknown = set(payload.member_telegram_ids) - set(allowed)
+    if unknown:
+        raise HTTPException(
+            status.HTTP_400_BAD_REQUEST, f"Users not in chat: {sorted(unknown)}"
+        )
+    if payload.leader_telegram_id and payload.leader_telegram_id not in allowed:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Leader is not in the chat")
+    if len(payload.member_telegram_ids) < 2:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A team needs at least 2 members")
+
+    current = {m.tg_user_id for m in team.members}
+    wanted = {allowed[tid].id for tid in payload.member_telegram_ids}
+    if current != wanted and any(r.status == RoundStatus.active for r in team.rounds):
+        raise HTTPException(
+            status.HTTP_409_CONFLICT,
+            "Состав нельзя менять, пока идёт оценка — закройте раунд",
+        )
+
+    team.name = payload.name
+    team.leader_id = (
+        allowed[payload.leader_telegram_id].id if payload.leader_telegram_id else None
+    )
+    for member in list(team.members):
+        if member.tg_user_id not in wanted:
+            await session.delete(member)
+    for tg_user_id in wanted - current:
+        session.add(TeamMember(team_id=team.id, tg_user_id=tg_user_id))
+
+    await session.commit()
+    return _team_to_schema(await _reload(session, Team, team.id))
+
+
 @router.delete("/teams/{team_id}", dependencies=[Depends(require_service_token)])
 async def delete_team(team_id: int, session: AsyncSession = Depends(get_session)):
     team = await session.get(Team, team_id)

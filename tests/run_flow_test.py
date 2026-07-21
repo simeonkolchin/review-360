@@ -269,6 +269,34 @@ def main() -> int:
     status, empty = client.call("PUT", f"/teams/{team['id']}/questionnaire", {"competencies": []})
     check("empty questionnaire is rejected", status == 422, f"status={status}")
 
+    print("\n5c. Teams can be edited")
+    status, edited = client.call(
+        "PUT", f"/teams/{team['id']}",
+        {
+            "name": "Продукт и рост",
+            "leader_telegram_id": PEOPLE[1][0],
+            "member_telegram_ids": [p[0] for p in PEOPLE[:3]],
+        },
+    )
+    check("team renamed and reshaped", status == 200 and edited["name"] == "Продукт и рост",
+          f"status={status} {edited}")
+    check("member removed", status == 200 and len(edited["members"]) == 3,
+          f"got={len(edited['members']) if status == 200 else status}")
+    check("leader moved", status == 200 and edited["leader"]["telegram_id"] == PEOPLE[1][0])
+
+    status, _ = client.call(
+        "PUT", f"/teams/{team['id']}",
+        {"name": "Слишком мало", "member_telegram_ids": [PEOPLE[0][0]]},
+    )
+    check("editing down to one person is rejected", status == 400, f"status={status}")
+
+    # put everyone back for the round that follows
+    client.call("PUT", f"/teams/{team['id']}", {
+        "name": "Продукт",
+        "leader_telegram_id": PEOPLE[0][0],
+        "member_telegram_ids": [p[0] for p in PEOPLE],
+    })
+
     print("\n6. Start the round")
     status, round_ = client.call("POST", f"/teams/{team['id']}/rounds")
     check("round started", status == 201, f"status={status} {round_}")
@@ -335,6 +363,17 @@ def main() -> int:
                     params={"telegram_id": telegram_id},
                 )
         check(f"{name} completed {done}/4 assignments", done == 4, f"done={done}")
+
+    print("\n7b. Membership is frozen while a round runs")
+    status, _ = client.call(
+        "PUT", f"/teams/{team['id']}",
+        {
+            "name": "Продукт",
+            "leader_telegram_id": PEOPLE[0][0],
+            "member_telegram_ids": [p[0] for p in PEOPLE[:3]],
+        },
+    )
+    check("cannot change the roster mid-round", status == 409, f"status={status}")
 
     print("\n8. Progress and close")
     status, progress = client.call("GET", f"/rounds/{round_['id']}")

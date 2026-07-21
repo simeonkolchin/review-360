@@ -231,6 +231,23 @@ async def delete_chat(chat_id: int, telegram_id: int = Depends(get_current_user_
     return result
 
 
+@router.put("/teams/{team_id}", summary="Edit a team")
+async def update_team(
+    team_id: int,
+    payload: TeamCreateRequest,
+    telegram_id: int = Depends(get_current_user_id),
+):
+    team = await data_client.put(
+        f"/teams/{team_id}",
+        params={"telegram_id": telegram_id},
+        json=payload.model_dump(),
+    )
+    await data_client.record_event(
+        "team_updated", telegram_id, team_id=team_id, members=len(team["members"])
+    )
+    return team
+
+
 @router.delete("/teams/{team_id}", summary="Delete a team")
 async def delete_team(team_id: int, telegram_id: int = Depends(get_current_user_id)):
     result = await data_client.delete(f"/teams/{team_id}")
