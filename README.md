@@ -20,7 +20,7 @@
 <img src="docs/demo.gif" width="82%" alt="Review 360 — demo"/>
 -->
 
-**🎥 Demo — coming up:** a full walkthrough from an empty group chat to a finished 360° review — the roster filling itself, drag-and-drop team building, the questionnaire panel, the review inside Telegram, and the live results dashboard.
+**🎥 Demo — filming tomorrow:** a full walkthrough from an empty group chat to a finished 360° review — people joining, drag-and-drop team building, the questionnaire panel, the single-message review inside Telegram, and the results dashboard updating live.
 
 <sub>Meanwhile the live instance is at <a href="https://tgreview360.ru">tgreview360.ru</a>.</sub>
 
@@ -186,6 +186,19 @@ The method collapses the moment people suspect they can be identified — so thi
 - Free-text notes come back as a **shuffled list of strings with no author**, held back by the same threshold.
 - **Self and leader assessments are labelled**, precisely because they are attributable by construction: everyone knows there is exactly one of each, so pretending otherwise would be the dishonest choice.
 
+That threshold has a consequence worth stating plainly, because teams run into
+it on their first round: **a small team can never show peer averages.** The
+leader's view is counted apart, so everyone else is rated by *everyone except
+themselves and the leader* — a team of three leaves each person with a single
+peer answer, and a single answer is not anonymous by any definition. With the
+default of three you need **four people** in a team without a leader, **five**
+with one.
+
+The launch dialog does this arithmetic before the round starts, says how many
+colleagues will rate each person, and offers to add more — rather than letting
+you discover it after everyone has voted. Teams that cannot produce averages
+are marked in the list.
+
 ## 📝 Questionnaires
 
 Questions are not hard-coded. They resolve at three scopes, most specific first:
@@ -237,13 +250,21 @@ Each is rated 1–5. For every person the engine produces the self score, the pe
 
 - **Login** — a decoding headline (rAF text-scramble, stepped on a timer, `aria-label` for screen readers, instant for `prefers-reduced-motion`) and a three-step card that opens the bot.
 - **Overview** — connected chats as cards, each with the group's own photo, an onboarding path for the first one.
-- **Chat page** — a banner with the group's photo and title, live member and team counts, and a marker on anyone not yet on a team. A menu deletes the chat: teams, rounds, answers and settings are wiped and the bot leaves the group.
+- **Chat page** — the group's photo and title, and the member list: search, people with no team sorted to the top, and the teams someone already belongs to as tags beside their name (extra ones collapse into `+N`). Warns when the bot is not an admin, or has been removed from the group — offering to invite it back or delete the chat with all its data.
 - **Team builder** — drag members from the participant list into the team zone, crown the leader, create. One person can lead several teams. Everything is also clickable, so it works without a mouse drag.
-- **Questionnaire panel** — slides in from the right, for the chat or for one team; drag to reorder, one button to push the chat's list onto every team.
+- **Team editor** — rename, move the crown, add or drop people, with a live verdict on whether averages will be computed. Membership is frozen while a round runs: the assignments were built from the roster as it stood.
+- **Questionnaire panel** — slides in from the right, for the chat or for one team; drag to reorder, one button to push the chat's list onto every team, another to fall back to the built-in five.
 - **Round** — live participant board (не начал / в процессе / прошёл), progress bars that move on their own, and a modal confirming exactly who is about to be pinged.
 - **Results** — a radar per person, self-vs-team bars per competency, and the anonymous comments underneath.
 
-Dark UI, Geist, blue accent, motion on every transition — page enters, staggered cards, scrim modals, pressed-button feedback.
+**Nothing needs reloading.** Chats, members, round progress and results all poll
+on their own and pause while the tab is hidden; anything that arrives while you
+are watching slides in with a brief highlight. The first load is exempt — every
+row is new then, and lighting all of them up would say nothing.
+
+Dark UI, Geist, blue accent, motion on every transition — page enters, staggered
+cards, scrim modals and a side panel that slides both ways, pressed-button
+feedback.
 
 <!-- SCREENSHOTS: drop the files into docs/ and uncomment
 <div align="center">
@@ -342,7 +363,7 @@ Public surface, all under `/api`, all behind the session cookie:
 | `GET` `PUT` | `/chats/{id}/questionnaire` | Read / replace the chat questionnaire |
 | `POST` | `/chats/{id}/questionnaire/apply` | Push it onto every team |
 | `GET` `PUT` `DELETE` | `/teams/{id}/questionnaire` | Team override — read, set, drop |
-| `DELETE` | `/teams/{id}` | Delete a team |
+| `PUT` `DELETE` | `/teams/{id}` | Edit or delete a team |
 | `DELETE` | `/chats/{id}` | Wipe a chat's data and make the bot leave the group |
 | `POST` | `/teams/{id}/rounds` | Start a round — posts into the group |
 | `GET` | `/rounds/{id}` | Live progress |
