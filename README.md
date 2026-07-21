@@ -20,7 +20,7 @@
 <img src="docs/demo.gif" width="82%" alt="Review 360 — demo"/>
 -->
 
-**🎥 Demo — coming up:** a full walkthrough from an empty group chat to a finished 360° review — enrolment, drag-and-drop team building, the review inside Telegram, and the results dashboard.
+**🎥 Demo — coming up:** a full walkthrough from an empty group chat to a finished 360° review — the roster filling itself, drag-and-drop team building, the questionnaire panel, the review inside Telegram, and the live results dashboard.
 
 <sub>Meanwhile the live instance is at <a href="https://tgreview360.ru">tgreview360.ru</a>.</sub>
 
@@ -105,6 +105,12 @@ This is the part that decides whether such a product is even possible.
 | **A bot cannot list group members** | The method was removed from the Bot API for privacy — only `getChatAdministrators`, `getChatMemberCount` and per-user lookups remain | The roster is **assembled passively**: the full admin list, every `chat_member` join/leave, and the author of any message sent while the bot is in the chat. Nobody presses anything |
 | **A bot cannot message someone first** | Telegram requires the user to open the dialog | The group post carries a **personal deep link** (`t.me/bot?start=<token>`). Pressing *Start* opens the dialog *and* begins that person's review in one motion |
 
+> **Give the bot admin rights in the group** (or turn Group Privacy off in
+> BotFather). With privacy mode on — the default — Telegram only forwards
+> commands and replies to the bot, so it cannot notice everyone else writing and
+> the roster fills up far more slowly. Admins are always visible either way, and
+> `/members` in the chat re-syncs on demand.
+
 The same mechanism powers **login**. The site has no Telegram Login Widget — it needs a BotFather-registered domain and never works on localhost. Instead the site mints a **one-time token**, opens the bot with it, and polls until the bot confirms. Tokens are single-use and expire in ten minutes; the session then lives in an httpOnly cookie.
 
 ## 🏗️ Architecture
@@ -151,7 +157,7 @@ review-360/
 │   └── app/{routes,schemas,services,utils}
 ├── data-service/    database, scoring engine, anonymity
 │   └── app/{routes,schemas,engine,models,utils}
-├── bot/             aiogram 3 — enrolment, DM review, results
+├── bot/             aiogram 3 — roster sync, DM review, results
 │   └── app/{handlers,keyboards,services}
 ├── frontend/        React 18 + TypeScript + Vite + Tailwind v4
 ├── nginx/           single entry point
@@ -320,7 +326,7 @@ Public surface, all under `/api`, all behind the session cookie:
 | `GET` | `/auth/login-status` | Poll until the bot confirms; sets the cookie |
 | `GET` / `POST` | `/auth/me`, `/auth/logout` | Session |
 | `GET` | `/chats` | Chats you belong to |
-| `GET` | `/chats/{id}/members` | People who enrolled themselves |
+| `GET` | `/chats/{id}/members` | Everyone the bot has seen in the chat |
 | `GET` `POST` | `/chats/{id}/teams` | List / create teams |
 | `GET` `PUT` | `/chats/{id}/questionnaire` | Read / replace the chat questionnaire |
 | `POST` | `/chats/{id}/questionnaire/apply` | Push it onto every team |
@@ -332,14 +338,14 @@ Public surface, all under `/api`, all behind the session cookie:
 | `GET` | `/rounds/{id}/results` | Aggregated results |
 | `GET` | `/stats` | Usage statistics |
 
-Bot-only routes live under `/bot/*` behind `X-Bot-Token`: `enroll`, `tasks`, `responses`, `results`, `confirm-login`.
+Bot-only routes live under `/bot/*` behind `X-Bot-Token`: `enroll` (record a member), `leave`, `reachable`, `tasks`, `responses`, `results`, `confirm-login`.
 Generated specs: [`openapi_spec/`](openapi_spec/).
 
 ## 🗄️ Data model
 
 ```mermaid
 erDiagram
-    TGUSER ||--o{ MEMBERSHIP : "enrolled in"
+    TGUSER ||--o{ MEMBERSHIP : "seen in chat"
     CHAT   ||--o{ MEMBERSHIP : has
     CHAT   ||--o{ TEAM : contains
     TEAM   ||--o{ TEAMMEMBER : has
@@ -371,7 +377,13 @@ make test
 
 Drives the real HTTP stack end to end — no mocks, no fixtures poked into the database:
 
-enrolment → auth is genuinely required → login through the bot bridge → team creation → round start (16 assignments for a team of 4) → every answer submitted → free-text comments → close → aggregation and the anonymity threshold → statistics. **35 assertions.**
+roster fills from the bot → auth is genuinely required → login through the bot
+bridge → team creation → questionnaire edited for the chat, then overridden for
+one team → round start (16 assignments for a team of 4, using the team's own
+questions) → participant states move from `not_started` to `done` → every answer
+submitted → free-text comments → close → aggregation and the anonymity threshold
+→ editing questions afterwards leaves the finished round untouched → «apply to
+all teams» → statistics. **51 assertions.**
 
 ## 🗺️ Roadmap
 

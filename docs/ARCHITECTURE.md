@@ -113,7 +113,7 @@ things worth the extra process:
 
 ```mermaid
 erDiagram
-    TGUSER ||--o{ MEMBERSHIP : "self-enrolled"
+    TGUSER ||--o{ MEMBERSHIP : "seen in chat"
     CHAT   ||--o{ MEMBERSHIP : has
     CHAT   ||--o{ TEAM : contains
     TEAM   ||--o{ TEAMMEMBER : has
