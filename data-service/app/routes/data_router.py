@@ -178,6 +178,7 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
             Membership.chat_id == chat.id, Membership.tg_user_id == user.id
         )
     )
+    already = membership is not None
     if membership is None:
         membership = Membership(chat_id=chat.id, tg_user_id=user.id)
         session.add(membership)
@@ -187,7 +188,17 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
         membership.is_admin = True
 
     await session.commit()
-    return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
+    # The count comes back so the bot can keep the counter on its button honest.
+    member_count = await session.scalar(
+        select(func.count(Membership.id)).where(Membership.chat_id == chat.id)
+    )
+    return {
+        "chat_id": chat.id,
+        "telegram_id": user.telegram_id,
+        "enrolled": True,
+        "already": already,
+        "member_count": member_count,
+    }
 
 
 @router.get("/users/ids", dependencies=[Depends(require_service_token)])

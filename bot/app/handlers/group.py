@@ -17,8 +17,9 @@ import time
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import ChatMemberUpdated, Message
+from aiogram.types import CallbackQuery, ChatMemberUpdated, Message
 
+from app.keyboards.inline import enroll_keyboard
 from app.services import gateway
 from app.services.photos import get_avatar_url, get_chat_photo
 
@@ -63,7 +64,8 @@ async def _sync_admins(bot: Bot, chat) -> int:
     """Pull the full admin list — the only roster Telegram hands over.
 
     Also refreshes the group's own photo, so the chat card on the site picks it
-    up the moment the bot has a reason to look.
+    up the moment the bot has a reason to look. Returns how many people the
+    backend now knows in this chat, which is what the tally should show.
     """
     chat_photo = await get_chat_photo(bot, chat.id)
     try:
@@ -71,18 +73,19 @@ async def _sync_admins(bot: Bot, chat) -> int:
     except Exception as exc:
         logger.warning("cannot read admins of %s: %s", chat.id, exc)
         return 0
-    count = 0
+    known = 0
     for member in admins:
         # The bot is an admin of its own group — it is not a participant.
         if member.user.is_bot:
             continue
         avatar = await get_avatar_url(bot, member.user.id)
-        if await gateway.enroll(
+        result = await gateway.enroll(
             chat.id, chat.title or "Группа", member.user,
             is_admin=True, photo_url=avatar, chat_photo_url=chat_photo,
-        ):
-            count += 1
-    return count
+        )
+        if result:
+            known = result.get("member_count", known)
+    return known
 
 
 @router.message(F.migrate_to_chat_id)
@@ -119,17 +122,18 @@ async def members_added(message: Message) -> None:
         is_admin = bool(me_member and me_member.status in {"administrator", "creator"})
 
         hint = (
-            "Остальные появятся, как только напишут что-нибудь в чате."
+            "Тех, кто пишет в чате, я и так замечаю."
             if is_admin
-            else "⚠️ Сделайте меня <b>администратором</b> — без этого Telegram не "
-                 "показывает мне сообщения остальных, и список почти не пополняется."
+            else "⚠️ Сделайте меня <b>администратором</b> — иначе я не вижу даже "
+                 "сообщения остальных."
         )
         await message.answer(
             "👋 Привет! Я собираю обратную связь по методу <b>«Оценка 360»</b>.\n\n"
-            f"Участники подтягиваются автоматически — уже вижу <b>{known}</b>. "
-            f"{hint}\n\n"
-            "Дальше — соберите команду на сайте и запустите оценку: "
-            "я отмечу всех здесь и пришлю каждому опрос в личку."
+            "Нажмите «Участвую» — так я точно узнаю всех, кого можно включать в "
+            "команды. Telegram не отдаёт ботам список участников, поэтому одна "
+            "кнопка надёжнее любых догадок.\n\n"
+            f"<i>{hint}</i>",
+            reply_markup=enroll_keyboard(known),
         )
         return
 
@@ -174,16 +178,40 @@ async def membership_changed(update: ChatMemberUpdated) -> None:
         await gateway.forget(update.chat.id, user.id)
 
 
+@router.message(Command("enroll"), F.chat.type.in_(GROUPS))
 @router.message(Command("members"), F.chat.type.in_(GROUPS))
-async def resync(message: Message) -> None:
-    """Manual nudge: re-read the admin list and record whoever asked."""
-    await _remember(message.bot, message.chat, message.from_user, with_photo=True)
-    known = await _sync_admins(message.bot, message.chat)
+async def ask_to_enroll(message: Message) -> None:
+    """Put the join button in the chat and record whoever asked for it."""
+    result = await _remember(message.bot, message.chat, message.from_user, with_photo=True)
+    count = (result or {}).get("member_count", 0)
     await message.answer(
-        f"🔄 Список обновлён — вижу {known} администратор(ов) и всех, кто писал в чате.\n\n"
-        "<i>Telegram не отдаёт ботам полный список участников группы, поэтому "
-        "остальные добавятся, как только напишут сюда хоть что-то.</i>"
+        "🎯 <b>Оценка 360</b>\n\n"
+        "Нажмите «Участвую», чтобы попасть в список — из него на сайте "
+        "собираются команды.\n\n"
+        "<i>Заодно это даёт мне право написать вам в личку, когда начнётся опрос.</i>",
+        reply_markup=enroll_keyboard(count),
     )
+
+
+@router.callback_query(F.data == "enroll")
+async def enrolled(query: CallbackQuery) -> None:
+    """Someone tapped the join button — record them and update the tally."""
+    chat = query.message.chat
+    result = await _remember(query.bot, chat, query.from_user, with_photo=True)
+    if not result:
+        await query.answer("Не получилось записать, попробуйте ещё раз", show_alert=True)
+        return
+
+    await query.answer(
+        "Вы уже в списке ✅" if result.get("already") else "Записал, спасибо ✅"
+    )
+    try:
+        await query.message.edit_reply_markup(
+            reply_markup=enroll_keyboard(result.get("member_count", 0))
+        )
+    except Exception as exc:
+        # "message is not modified" when the count did not change — harmless
+        logger.debug("cannot refresh the tally: %s", exc)
 
 
 @router.message(F.chat.type.in_(GROUPS))

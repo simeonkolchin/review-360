@@ -102,6 +102,20 @@ def main() -> int:
         )
         check(f"enrolled {name}", status == 200, f"status={status}")
 
+    # The join button shows a tally, so enrolment has to report the count back.
+    status, again = client.call(
+        "POST", "/bot/enroll",
+        {
+            "telegram_chat_id": CHAT_ID, "chat_title": "Тестовая команда",
+            "telegram_id": PEOPLE[0][0], "first_name": PEOPLE[0][2], "can_dm": True,
+        },
+        bot=True,
+    )
+    check("enrolment reports the tally", status == 200 and again.get("member_count") == 4,
+          f"got={again.get('member_count') if status == 200 else status}")
+    check("pressing twice does not double count", again.get("already") is True,
+          f"already={again.get('already')}")
+
     print("\n3. Auth is required")
     fresh = Client(args.base_url, args.bot_token)
     status, _ = fresh.call("GET", "/chats")

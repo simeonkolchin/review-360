@@ -11,6 +11,14 @@ from app import SCORE_MAX, SCORE_MIN
 SCORE_LABELS = {1: "1 · слабо", 2: "2", 3: "3 · норма", 4: "4", 5: "5 · отлично"}
 
 
+def enroll_keyboard(count: int = 0) -> InlineKeyboardMarkup:
+    """Join button carrying its own tally, so the group sees it filling up."""
+    label = "✋ Участвую" if not count else f"✋ Участвую · {count}"
+    return InlineKeyboardMarkup(
+        inline_keyboard=[[InlineKeyboardButton(text=label, callback_data="enroll")]]
+    )
+
+
 def score_keyboard(assignment_id: int, competency_id: int) -> InlineKeyboardMarkup:
     """Score buttons for one competency, two rows so the labels stay readable."""
     buttons = [
