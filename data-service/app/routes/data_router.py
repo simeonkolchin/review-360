@@ -489,6 +489,28 @@ async def reset_team_questionnaire(team_id: int, session: AsyncSession = Depends
     return await get_team_questionnaire(team_id, session)
 
 
+@router.delete(
+    "/chats/{chat_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def reset_chat_questionnaire(chat_id: int, session: AsyncSession = Depends(get_session)):
+    """Drop the chat's own questions so it falls back to the built-in five."""
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat not found")
+    for row in await _competencies_at(session, chat_id=chat.id):
+        used = await session.scalar(
+            select(func.count(Response.id)).where(Response.competency_id == row.id)
+        )
+        if used:
+            row.is_active = False
+        else:
+            await session.delete(row)
+    await session.commit()
+    return await get_chat_questionnaire(chat_id, session)
+
+
 @router.post(
     "/chats/{chat_id}/questionnaire/apply",
     dependencies=[Depends(require_service_token)],

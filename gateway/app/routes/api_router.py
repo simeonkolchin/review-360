@@ -96,6 +96,13 @@ async def save_chat_questionnaire(
     return saved
 
 
+@router.delete("/chats/{chat_id}/questionnaire", summary="Back to the built-in questionnaire")
+async def reset_chat_questionnaire(chat_id: int, telegram_id: int = Depends(get_current_user_id)):
+    result = await data_client.delete(f"/chats/{chat_id}/questionnaire")
+    await data_client.record_event("questionnaire_reset", telegram_id, chat_id=chat_id)
+    return result
+
+
 @router.post(
     "/chats/{chat_id}/questionnaire/apply",
     summary="Push the chat questionnaire onto every team",

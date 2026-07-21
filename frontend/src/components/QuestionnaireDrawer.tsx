@@ -88,13 +88,15 @@ export default function QuestionnaireDrawer({
     } catch (e) { setError((e as Error).message) } finally { setBusy(null) }
   }
 
-  const resetToChat = async () => {
+  const resetToInherited = async () => {
     setError(null); setBusy('reset')
     try {
       const back = await api.del<Questionnaire>(base)
       setItems(back.competencies.map(draftOf))
       setSource(back.source)
-      setNote('Команда снова использует общий опросник')
+      setNote(scope === 'team'
+        ? 'Команда снова использует общий опросник чата'
+        : 'Вернули стандартный набор из пяти компетенций')
       onSaved?.()
     } catch (e) { setError((e as Error).message) } finally { setBusy(null) }
   }
@@ -124,11 +126,13 @@ export default function QuestionnaireDrawer({
       subtitle={`${items.length} вопрос(ов) · сейчас действует ${SOURCE_LABEL[source] ?? source}`}
       footer={
         <>
-          {scope === 'team' && source === 'team' && (
-            <button className="btn btn-ghost px-3 py-2.5" onClick={resetToChat} disabled={!!busy}
-                    title="Вернуться к общему опроснику чата">
+          {source === scope && (
+            <button className="btn btn-ghost px-3 py-2.5" onClick={resetToInherited} disabled={!!busy}
+                    title={scope === 'team'
+                      ? 'Вернуться к общему опроснику чата'
+                      : 'Вернуть стандартные пять компетенций'}>
               {busy === 'reset' ? <Loader2 className="w-4 h-4 spin" /> : <RotateCcw className="w-4 h-4" />}
-              Как в чате
+              {scope === 'team' ? 'Как в чате' : 'Стандартные'}
             </button>
           )}
           {scope === 'chat' && (

@@ -177,9 +177,11 @@ def main() -> int:
 
     print("\n5b. Questionnaires: chat template and per-team override")
     status, base = client.call("GET", f"/chats/{chat['id']}/questionnaire")
-    check("chat questionnaire falls back to defaults", status == 200 and base["source"] == "default",
+    # "default" on a clean database, "chat" when the suite is re-run against a
+    # live one — both are correct, an empty list never is.
+    check("chat questionnaire resolves",
+          status == 200 and base["source"] in {"default", "chat"} and base["competencies"],
           f"status={status} source={base.get('source') if status == 200 else base}")
-    default_count = len(base["competencies"])
 
     status, saved = client.call(
         "PUT",
@@ -193,7 +195,6 @@ def main() -> int:
     check("chat questionnaire saved", status == 200 and saved["source"] == "chat", f"status={status}")
     check("chat questionnaire has 3 questions", len(saved["competencies"]) == 3,
           f"got={len(saved['competencies']) if status == 200 else '-'}")
-    check("chat questions differ from defaults", len(saved["competencies"]) != default_count)
 
     status, inherited = client.call("GET", f"/teams/{team['id']}/questionnaire")
     check("team inherits the chat questionnaire", status == 200 and inherited["source"] == "chat",
@@ -339,9 +340,11 @@ def main() -> int:
     check("stats endpoint works", status == 200, f"status={status}")
     if status == 200:
         check("events were logged", stats["counts"]["events"] > 0, f"got={stats['counts']}")
-        # >= not == so the suite can be re-run against a live database
-        check("responses stored", stats["counts"]["responses"] >= 80,
-              f"got={stats['counts']['responses']}")
+        # One response per assignment per question in this round's questionnaire.
+        # >= not == so the suite can be re-run against a live database.
+        expected = round_["total_assignments"] * len(round_["competencies"])
+        check("responses stored", stats["counts"]["responses"] >= expected,
+              f"got={stats['counts']['responses']} expected>={expected}")
 
     print(f"\n{'-' * 46}")
     print(f"  {OK}passed: {passed}{RESET}   {ERR if failed else DIM}failed: {failed}{RESET}")

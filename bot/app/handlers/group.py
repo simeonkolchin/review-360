@@ -13,6 +13,7 @@ announcement instead: pressing Start opens the dialogue and begins the review.
 """
 
 import logging
+import time
 
 from aiogram import Bot, F, Router
 from aiogram.filters import Command
@@ -25,6 +26,23 @@ router = Router()
 logger = logging.getLogger(__name__)
 
 GROUPS = {"group", "supergroup"}
+
+# (chat_id, user_id) -> monotonic seconds. A chatty group would otherwise hit
+# the gateway on every single message to re-learn what it already knows.
+_SEEN: dict[tuple[int, int], float] = {}
+SEEN_TTL_SEC = 600
+
+
+def _recently_seen(chat_id: int, user_id: int) -> bool:
+    now = time.monotonic()
+    key = (chat_id, user_id)
+    if now - _SEEN.get(key, 0) < SEEN_TTL_SEC:
+        return True
+    _SEEN[key] = now
+    if len(_SEEN) > 10_000:  # cheap bound; the cache is pure optimisation
+        for stale in [k for k, t in _SEEN.items() if now - t > SEEN_TTL_SEC]:
+            _SEEN.pop(stale, None)
+    return False
 
 
 async def _remember(bot: Bot, chat, user, *, is_admin: bool = False, with_photo: bool = False):
@@ -110,5 +128,11 @@ async def any_group_message(message: Message) -> None:
     """Last resort, and in practice the most effective one: passive harvesting.
 
     Runs after every other group handler, so it never swallows a command.
+
+    Note this only sees messages at all if the bot is an administrator or its
+    privacy mode is off in BotFather — otherwise Telegram hands it commands and
+    replies only, and the roster fills up more slowly.
     """
+    if _recently_seen(message.chat.id, message.from_user.id):
+        return
     await _remember(message.bot, message.chat, message.from_user)

@@ -411,6 +411,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Data
+      summary: Reset Chat Questionnaire
+      description: Drop the chat's own questions so it falls back to the built-in
+        five.
+      operationId: reset_chat_questionnaire_chats__chat_id__questionnaire_delete
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /teams/{team_id}/questionnaire:
     get:
       tags:
