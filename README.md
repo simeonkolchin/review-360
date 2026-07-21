@@ -16,13 +16,9 @@
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-<!-- DEMO: drop docs/demo.gif in place and uncomment the line below
-<img src="docs/demo.gif" width="82%" alt="Review 360 — demo"/>
--->
+<img src="docs/hero.svg" width="100%" alt="Узнай, как тебя видит команда"/>
 
-**🎥 Demo — filming tomorrow:** a full walkthrough from an empty group chat to a finished 360° review — people joining, drag-and-drop team building, the questionnaire panel, the single-message review inside Telegram, and the results dashboard updating live.
-
-<sub>Meanwhile the live instance is at <a href="https://tgreview360.ru">tgreview360.ru</a>.</sub>
+<sub>The site's own headline, running here as an animated SVG — see <a href="tools/make_hero_svg.py">how</a>.</sub>
 
 </div>
 
@@ -30,7 +26,25 @@
 
 ## 📋 Contents
 
-[The problem](#-the-problem) · [The idea](#-the-idea) · [How it works](#-how-it-works) · [Telegram limits](#-two-telegram-limits-and-the-way-around-them) · [Architecture](#️-architecture) · [Anonymity](#-anonymity-is-a-rule-not-a-setting) · [Scoring](#-scoring) · [Interface](#-interface) · [Quick start](#-quick-start) · [Deployment](#-production-deployment) · [API](#-api) · [Data model](#️-data-model) · [Testing](#-testing) · [Roadmap](#️-roadmap)
+[Demo](#-demo) · [The problem](#-the-problem) · [The idea](#-the-idea) · [How it works](#-how-it-works) · [Telegram limits](#-two-telegram-limits-and-the-way-around-them) · [Architecture](#️-architecture) · [Anonymity](#-anonymity-is-a-rule-not-a-setting) · [Scoring](#-scoring) · [Interface](#-interface) · [Quick start](#-quick-start) · [Deployment](#-production-deployment) · [API](#-api) · [Data model](#️-data-model) · [Testing](#-testing) · [Roadmap](#️-roadmap)
+
+---
+
+## 🎬 Demo
+
+<!-- Drop docs/demo.gif in place and uncomment — see docs/README.md for the ffmpeg recipe
+<div align="center">
+<img src="docs/demo.gif" width="86%" alt="Review 360 — walkthrough"/>
+</div>
+-->
+
+**Filming tomorrow:** the whole path in one take — the bot joining a group and
+people tapping *Участвую*, teams assembled by dragging, the questionnaire panel,
+the review arriving in Telegram as a single message that edits itself, and the
+dashboard filling in live as answers land.
+
+Until then the live instance is at **[tgreview360.ru](https://tgreview360.ru)**,
+and the bot is [@tgreview360bot](https://t.me/tgreview360bot).
 
 ---
 
