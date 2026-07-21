@@ -228,8 +228,9 @@ Each is rated 1–5. For every person the engine produces the self score, the pe
 ## 🖥️ Interface
 
 - **Login** — a decoding headline (rAF text-scramble, stepped on a timer, `aria-label` for screen readers, instant for `prefers-reduced-motion`) and a three-step card that opens the bot.
-- **Overview** — connected chats as bento tiles, with an onboarding path for the first one.
-- **Team builder** — drag members from the participant list into the team zone, crown the leader, create. Everything is also clickable, so it works without a mouse drag.
+- **Overview** — connected chats as cards, each with the group's own photo, an onboarding path for the first one.
+- **Chat page** — a banner with the group's photo and title, live member and team counts, and a marker on anyone not yet on a team. A menu deletes the chat: teams, rounds, answers and settings are wiped and the bot leaves the group.
+- **Team builder** — drag members from the participant list into the team zone, crown the leader, create. One person can lead several teams. Everything is also clickable, so it works without a mouse drag.
 - **Questionnaire panel** — slides in from the right, for the chat or for one team; drag to reorder, one button to push the chat's list onto every team.
 - **Round** — live participant board (не начал / в процессе / прошёл), progress bars that move on their own, and a modal confirming exactly who is about to be pinged.
 - **Results** — a radar per person, self-vs-team bars per competency, and the anonymous comments underneath.
@@ -332,6 +333,7 @@ Public surface, all under `/api`, all behind the session cookie:
 | `POST` | `/chats/{id}/questionnaire/apply` | Push it onto every team |
 | `GET` `PUT` `DELETE` | `/teams/{id}/questionnaire` | Team override — read, set, drop |
 | `DELETE` | `/teams/{id}` | Delete a team |
+| `DELETE` | `/chats/{id}` | Wipe a chat's data and make the bot leave the group |
 | `POST` | `/teams/{id}/rounds` | Start a round — posts into the group |
 | `GET` | `/rounds/{id}` | Live progress |
 | `POST` | `/rounds/{id}/close` | Close a round |
