@@ -10,7 +10,10 @@ interface Stats { counts: Record<string, number> }
 
 export default function Chats() {
   const config = useAuthConfig()
-  const addToGroup = botLink(config?.bot_username ?? '', '?startgroup=true')
+  // `admin=` makes Telegram offer the bot as an administrator right in the add
+  // dialog — one tap instead of digging through group settings afterwards.
+  // Admin status is what lifts privacy mode, so the roster fills from messages.
+  const addToGroup = botLink(config?.bot_username ?? '', '?startgroup=true&admin=invite_users')
   const [chats, setChats] = useState<Chat[]>([])
   const [stats, setStats] = useState<Stats | null>(null)
   const [loading, setLoading] = useState(true)

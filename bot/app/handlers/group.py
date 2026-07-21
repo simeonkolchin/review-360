@@ -91,10 +91,23 @@ async def members_added(message: Message) -> None:
     if added_bot:
         await _remember(message.bot, message.chat, message.from_user, is_admin=True)
         known = await _sync_admins(message.bot, message.chat)
+        me_member = None
+        try:
+            me_member = await message.bot.get_chat_member(message.chat.id, me.id)
+        except Exception as exc:
+            logger.debug("cannot read own status in %s: %s", message.chat.id, exc)
+        is_admin = bool(me_member and me_member.status in {"administrator", "creator"})
+
+        hint = (
+            "Остальные появятся, как только напишут что-нибудь в чате."
+            if is_admin
+            else "⚠️ Сделайте меня <b>администратором</b> — без этого Telegram не "
+                 "показывает мне сообщения остальных, и список почти не пополняется."
+        )
         await message.answer(
             "👋 Привет! Я собираю обратную связь по методу <b>«Оценка 360»</b>.\n\n"
             f"Участники подтягиваются автоматически — уже вижу <b>{known}</b>. "
-            "Остальные появятся, как только напишут что-нибудь в чате.\n\n"
+            f"{hint}\n\n"
             "Дальше — соберите команду на сайте и запустите оценку: "
             "я отмечу всех здесь и пришлю каждому опрос в личку."
         )
@@ -102,6 +115,27 @@ async def members_added(message: Message) -> None:
 
     for user in message.new_chat_members:
         await _remember(message.bot, message.chat, user, with_photo=True)
+
+
+@router.my_chat_member()
+async def own_status_changed(update: ChatMemberUpdated) -> None:
+    """Our own rights changed — most usefully, we were made an administrator.
+
+    That is the moment privacy mode stops hiding other people's messages, so it
+    is also the moment the roster can actually start filling up.
+    """
+    if update.chat.type not in GROUPS:
+        return
+    was_admin = update.old_chat_member.status in {"administrator", "creator"}
+    is_admin = update.new_chat_member.status in {"administrator", "creator"}
+    if is_admin and not was_admin:
+        known = await _sync_admins(update.bot, update.chat)
+        await update.bot.send_message(
+            update.chat.id,
+            "✅ Спасибо, теперь я администратор — вижу всех, кто пишет в чате, "
+            f"и уже записал {known} человек(а).\n\n"
+            "<i>Остальные добавятся, как только напишут сюда хоть что-нибудь.</i>",
+        )
 
 
 @router.chat_member()
