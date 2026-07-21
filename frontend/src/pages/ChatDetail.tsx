@@ -3,7 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
-  MoreVertical, LogOut, AlertTriangle, UserCircle2,
+  MoreVertical, LogOut, AlertTriangle,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team } from '../api/client'
 import { useLive } from '../api/live'
@@ -55,9 +55,8 @@ export default function ChatDetail() {
     .map(id => members.find(m => m.telegram_id === id))
     .filter((m): m is Member => Boolean(m))
 
-  // Who is not on any team yet — the people worth nudging into one.
+  // Everyone already on a team — anyone missing gets a marker in the list.
   const assigned = new Set(teams.flatMap(t => t.members.map(m => m.telegram_id)))
-  const unassigned = members.filter(m => !assigned.has(m.telegram_id))
 
   const create = async () => {
     setError(null); setBusy(true)
@@ -106,12 +105,6 @@ export default function ChatDetail() {
         <div className="flex items-center gap-2.5 min-w-0">
           <ChatAvatar name={chat?.title ?? '…'} url={chat?.photo_url} size={32} />
           <span className="text-[15px] truncate">{chat?.title ?? 'Чат'}</span>
-          {unassigned.length > 0 && (
-            <span className="flex items-center gap-1.5 text-[12px] text-[var(--color-warning)] shrink-0"
-                  title="Участники, которых ещё нет ни в одной команде">
-              <UserCircle2 className="w-3.5 h-3.5" /> {unassigned.length} без команды
-            </span>
-          )}
         </div>
 
         <div className="flex-1" />
@@ -188,7 +181,8 @@ export default function ChatDetail() {
                   <div className="text-[13.5px] truncate flex items-center gap-1.5">
                     {m.display_name}
                     {!assigned.has(m.telegram_id) && (
-                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] shrink-0"
+                      <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] shrink-0
+                                       cursor-help"
                             title="Ещё не в команде" />
                     )}
                   </div>
