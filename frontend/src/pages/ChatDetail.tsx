@@ -262,21 +262,19 @@ export default function ChatDetail() {
             {syncNote ?? 'Подтягиваются из чата автоматически. Перетащите в команду справа — или просто нажмите на карточку'}
           </p>
 
-          {members.length > 6 && (
-            <div className="relative mb-3">
+          <div className="relative mb-3">
               <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2
                                  text-[var(--color-muted)] pointer-events-none" />
               <input className="input !pl-9 !py-2 text-[13.5px]" placeholder="Поиск по имени или @username"
                      value={query} onChange={e => setQuery(e.target.value)} />
-              {query && (
-                <button onClick={() => setQuery('')} aria-label="Очистить"
-                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md
-                                   text-[var(--color-muted)] hover:text-[var(--color-text)] transition">
-                  <X className="w-3.5 h-3.5" />
-                </button>
-              )}
-            </div>
-          )}
+            {query && (
+              <button onClick={() => setQuery('')} aria-label="Очистить"
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md
+                                 text-[var(--color-muted)] hover:text-[var(--color-text)] transition">
+                <X className="w-3.5 h-3.5" />
+              </button>
+            )}
+          </div>
 
           <div className="scroll-slim flex flex-col gap-2 overflow-y-auto pr-1"
                style={{ maxHeight: 'min(56vh, 520px)' }}>
@@ -309,19 +307,19 @@ export default function ChatDetail() {
                 <GripVertical className="w-4 h-4 text-[var(--color-muted)] shrink-0" />
                 <Avatar name={m.display_name} url={m.photo_url} size={30} />
                 <div className="min-w-0 flex-1">
-                  <div className="text-[13.5px] truncate flex items-center gap-1.5">
-                    {m.display_name}
+                  <div className="flex items-center gap-1.5 min-w-0">
+                    <span className="text-[13.5px] truncate">{m.display_name}</span>
                     {!assigned.has(m.telegram_id) && (
                       <span className="w-1.5 h-1.5 rounded-full bg-[var(--color-warning)] shrink-0
                                        cursor-help"
                             title="Ещё не в команде" />
                     )}
+                    <TeamTags teams={teamsOf.get(m.telegram_id) ?? []} />
                   </div>
                   <div className="text-[11.5px] text-[var(--color-muted)] truncate">
                     {m.username ? '@' + m.username : 'без username'}
                     {m.can_dm ? '' : ' · не открыл бота'}
                   </div>
-                  <TeamTags teams={teamsOf.get(m.telegram_id) ?? []} />
                 </div>
                 <UserPlus className="w-4 h-4 text-[var(--color-muted)] shrink-0" />
               </div>
@@ -645,10 +643,10 @@ function TeamTags({ teams }: { teams: Team[] }) {
   const rest = teams.slice(TAGS_SHOWN)
 
   return (
-    <div className="flex items-center gap-1 mt-1.5 min-w-0">
+    <div className="flex items-center gap-1 min-w-0 shrink-0">
       {shown.map(team => (
         <span key={team.id} title={team.name}
-              className="shrink min-w-0 truncate max-w-[110px] px-1.5 py-0.5 rounded-md text-[10.5px]
+              className="shrink min-w-0 truncate max-w-[84px] px-1.5 py-0.5 rounded-md text-[10.5px] leading-[1.35]
                          bg-[rgba(59,130,246,.12)] text-[var(--color-accent)]
                          border border-[rgba(59,130,246,.25)]">
           {team.name}
@@ -656,7 +654,7 @@ function TeamTags({ teams }: { teams: Team[] }) {
       ))}
       {rest.length > 0 && (
         <span title={rest.map(t => t.name).join(', ')}
-              className="shrink-0 px-1.5 py-0.5 rounded-md text-[10.5px] cursor-help
+              className="shrink-0 px-1.5 py-0.5 rounded-md text-[10.5px] leading-[1.35] cursor-help
                          bg-[var(--color-surface)] text-[var(--color-muted)]
                          border border-[var(--color-border)]">
           +{rest.length}
