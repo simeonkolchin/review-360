@@ -1,6 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app import AUTH_COOKIE_NAME, DEV_LOGIN_ENABLED, JWT_TTL_HOURS, TELEGRAM_BOT_USERNAME
+from app import (
+    AUTH_COOKIE_NAME,
+    COOKIE_SECURE,
+    DEV_LOGIN_ENABLED,
+    JWT_TTL_HOURS,
+    TELEGRAM_BOT_USERNAME,
+)
 from app.schemas.requests import DevLoginRequest, TelegramAuthRequest
 from app.schemas.responses import UserResponse
 from app.services import data_client
@@ -19,6 +25,7 @@ def _set_cookie(response: Response, token: str) -> None:
         value=token,
         httponly=True,
         samesite="lax",
+        secure=COOKIE_SECURE,
         max_age=JWT_TTL_HOURS * 3600,
     )
 
@@ -75,7 +82,7 @@ async def dev_login(payload: DevLoginRequest, response: Response):
 
 @router.post("/logout", summary="Clear the session cookie")
 async def logout(response: Response):
-    response.delete_cookie(AUTH_COOKIE_NAME)
+    response.delete_cookie(AUTH_COOKIE_NAME, samesite="lax", secure=COOKIE_SECURE)
     return {"message": "Logged out"}
 
 

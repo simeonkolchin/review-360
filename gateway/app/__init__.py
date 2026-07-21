@@ -41,6 +41,8 @@ JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")
 JWT_ALGORITHM = os.getenv("JWT_ALGORITHM", "HS256")
 JWT_TTL_HOURS = _env_int("JWT_TTL_HOURS", 24)
 AUTH_COOKIE_NAME = os.getenv("AUTH_COOKIE_NAME", "review360_token")
+# HTTPS-only session cookie. Off by default so plain-HTTP localhost still works.
+COOKIE_SECURE = _env_bool("COOKIE_SECURE", False)
 DEV_LOGIN_ENABLED = _env_bool("DEV_LOGIN_ENABLED", True)
 TELEGRAM_AUTH_MAX_AGE_SEC = _env_int("TELEGRAM_AUTH_MAX_AGE_SEC", 86400)
 
