@@ -43,7 +43,7 @@ export default function ChatDetail() {
   const loading = live.loading
   // Somebody tapping «Участвую» in the group shows up here on the next poll —
   // highlighted, so a list that changes under your eyes is not confusing.
-  const arrivals = useArrivals(members.map(m => m.telegram_id))
+  const arrivals = useArrivals(members.map(m => m.telegram_id), !live.loading)
 
   // team builder
   const [name, setName] = useState('')

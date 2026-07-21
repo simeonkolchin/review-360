@@ -173,14 +173,22 @@ html::-webkit-scrollbar-corner,
 }
 @keyframes pulse { 0% { transform: scale(.7); opacity: .6 } 100% { transform: scale(1.4); opacity: 0 } }
 
-/* Something that arrived while you were watching: it slides in, then a ring
-   fades out. Loud enough to notice, quiet enough to ignore. */
-.just-arrived { animation: arrive .45s cubic-bezier(.2,.8,.3,1) both, glow 2.4s ease-out both; }
-@keyframes arrive { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: none } }
-@keyframes glow {
-  0%   { box-shadow: 0 0 0 1px var(--color-accent), 0 0 22px rgba(59,130,246,.35) }
-  100% { box-shadow: 0 0 0 1px transparent, 0 0 0 rgba(59,130,246,0) }
+/* Something that arrived while you were watching: it slides in, then the
+   highlight fades. The highlight lives *inside* the element — an outer glow
+   gets sliced by the scroll container these rows sit in, which looks broken.
+   An overlay also leaves the element's own colours untouched when it ends. */
+.just-arrived { position: relative; animation: arrive .45s cubic-bezier(.2,.8,.3,1) both; }
+.just-arrived::after {
+  content: '';
+  position: absolute; inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: rgba(59,130,246,.10);
+  box-shadow: inset 0 0 0 1px var(--color-accent);
+  animation: highlightOut 2.2s ease-out forwards;
 }
+@keyframes arrive { from { opacity: 0; transform: translateY(-6px) } to { opacity: 1; transform: none } }
+@keyframes highlightOut { from { opacity: 1 } to { opacity: 0 } }
 
 /* A value that just changed gets a brief highlight, so live updates are felt */
 .flash { animation: flash .9s ease both; }

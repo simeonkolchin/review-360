@@ -20,7 +20,7 @@ export default function Chats() {
   const chats = chatsLive.data ?? []
   const stats = statsLive.data
   const loading = chatsLive.loading
-  const fresh = useArrivals(chats.map(c => c.id))
+  const fresh = useArrivals(chats.map(c => c.id), !chatsLive.loading)
 
   const members = chats.reduce((n, c) => n + c.member_count, 0)
   const teams = chats.reduce((n, c) => n + c.team_count, 0)

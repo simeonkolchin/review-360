@@ -67,13 +67,22 @@ export function useLive<T>(path: string | null, intervalMs = 4000) {
  * The first batch is not "new": everything is new when a page opens, and
  * flashing the whole list would say nothing. Only what appears afterwards is
  * highlighted, and only for a moment.
+ *
+ * `ready` matters more than it looks. Lists start empty while the first request
+ * is in flight, so taking that emptiness as the baseline makes the entire first
+ * page look like it just arrived. Callers pass their loaded flag, and the
+ * baseline is taken from the first real answer — including a genuinely empty
+ * one, so the very first person to join is still greeted.
  */
-export function useArrivals(ids: (number | string)[], holdMs = 2500) {
+export function useArrivals(
+  ids: (number | string)[], ready = true, holdMs = 2500,
+) {
   const seen = useRef<Set<number | string> | null>(null)
   const [fresh, setFresh] = useState<Set<number | string>>(new Set())
 
   useEffect(() => {
-    if (seen.current === null) {          // first load — nothing to celebrate
+    if (!ready) return
+    if (seen.current === null) {          // first real answer — nothing to celebrate
       seen.current = new Set(ids)
       return
     }
@@ -84,7 +93,7 @@ export function useArrivals(ids: (number | string)[], holdMs = 2500) {
     const timer = window.setTimeout(() => setFresh(new Set()), holdMs)
     return () => clearTimeout(timer)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ids.join(','), holdMs])
+  }, [ids.join(','), ready, holdMs])
 
   return fresh
 }
