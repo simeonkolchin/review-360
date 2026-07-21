@@ -4,7 +4,7 @@ import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
   MoreVertical, LogOut, AlertTriangle, ShieldAlert, RefreshCw, Loader2, UserX, Plus,
-  Pencil,
+  Pencil, Search,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
 import { useLive, useArrivals } from '../api/live'
@@ -59,6 +59,7 @@ export default function ChatDetail() {
   const [confirmStart, setConfirmStart] = useState<Team | null>(null)
   const [confirmDeleteChat, setConfirmDeleteChat] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [query, setQuery] = useState('')
   const [syncing, setSyncing] = useState(false)
   const [syncNote, setSyncNote] = useState<string | null>(null)
   const [chatQuestions, setChatQuestions] = useState(false)
@@ -73,13 +74,30 @@ export default function ChatDetail() {
     if (leader === id) setLeader(null)
   }
 
-  const available = members.filter(m => !picked.includes(m.telegram_id))
+  // Which teams each person is already on — shown as tags next to their name.
+  const teamsOf = new Map<number, Team[]>()
+  for (const team of teams) {
+    for (const m of team.members) {
+      teamsOf.set(m.telegram_id, [...(teamsOf.get(m.telegram_id) ?? []), team])
+    }
+  }
+  const assigned = new Set(teamsOf.keys())
+
+  const needle = query.trim().toLowerCase()
+  const available = members
+    .filter(m => !picked.includes(m.telegram_id))
+    .filter(m => !needle
+      || m.display_name.toLowerCase().includes(needle)
+      || (m.username ?? '').toLowerCase().includes(needle))
+    // People with nowhere to go come first — they are the work left to do.
+    .sort((a, b) => {
+      const byTeam = (teamsOf.get(a.telegram_id)?.length ?? 0) -
+                     (teamsOf.get(b.telegram_id)?.length ?? 0)
+      return byTeam !== 0 ? byTeam : a.display_name.localeCompare(b.display_name, 'ru')
+    })
   const chosen = picked
     .map(id => members.find(m => m.telegram_id === id))
     .filter((m): m is Member => Boolean(m))
-
-  // Everyone already on a team — anyone missing gets a marker in the list.
-  const assigned = new Set(teams.flatMap(t => t.members.map(m => m.telegram_id)))
 
   const create = async () => {
     setError(null); setBusy(true)
@@ -240,11 +258,28 @@ export default function ChatDetail() {
               </button>
             </div>
           </div>
-          <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-4">
+          <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-3">
             {syncNote ?? 'Подтягиваются из чата автоматически. Перетащите в команду справа — или просто нажмите на карточку'}
           </p>
 
-          <div className="scroll-slim flex flex-col gap-2 max-h-[420px] overflow-auto pr-1">
+          {members.length > 6 && (
+            <div className="relative mb-3">
+              <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2
+                                 text-[var(--color-muted)] pointer-events-none" />
+              <input className="input !pl-9 !py-2 text-[13.5px]" placeholder="Поиск по имени или @username"
+                     value={query} onChange={e => setQuery(e.target.value)} />
+              {query && (
+                <button onClick={() => setQuery('')} aria-label="Очистить"
+                        className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-md
+                                   text-[var(--color-muted)] hover:text-[var(--color-text)] transition">
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
+
+          <div className="scroll-slim flex flex-col gap-2 overflow-y-auto pr-1"
+               style={{ maxHeight: 'min(56vh, 520px)' }}>
             {loading && [0, 1, 2].map(i => <div key={i} className="h-[52px] rounded-xl skeleton" />)}
 
             {!loading && members.length === 0 && (
@@ -255,7 +290,8 @@ export default function ChatDetail() {
 
             {!loading && members.length > 0 && available.length === 0 && (
               <p className="text-[13px] text-[var(--color-muted)] py-6 text-center m-0">
-                Все участники уже в черновике команды
+                {needle ? 'Никого не нашлось — попробуйте другое имя'
+                        : 'Все участники уже в черновике команды'}
               </p>
             )}
 
@@ -285,6 +321,7 @@ export default function ChatDetail() {
                     {m.username ? '@' + m.username : 'без username'}
                     {m.can_dm ? '' : ' · не открыл бота'}
                   </div>
+                  <TeamTags teams={teamsOf.get(m.telegram_id) ?? []} />
                 </div>
                 <UserPlus className="w-4 h-4 text-[var(--color-muted)] shrink-0" />
               </div>
@@ -587,6 +624,44 @@ export default function ChatDetail() {
         title={`Опросник — «${teamQuestions?.name ?? ''}»`}
         onSaved={loadTeams}
       />
+    </div>
+  )
+}
+
+/** How many team tags fit on one line before the rest collapse into a counter. */
+const TAGS_SHOWN = 2
+
+/**
+ * Which teams a person already belongs to.
+ *
+ * Names are user-written and can be long, so each tag truncates on its own and
+ * only the first couple are drawn; the rest become "+N" carrying the full list
+ * in its tooltip. That keeps a row exactly one line tall no matter how many
+ * teams someone ends up in.
+ */
+function TeamTags({ teams }: { teams: Team[] }) {
+  if (!teams.length) return null
+  const shown = teams.slice(0, TAGS_SHOWN)
+  const rest = teams.slice(TAGS_SHOWN)
+
+  return (
+    <div className="flex items-center gap-1 mt-1.5 min-w-0">
+      {shown.map(team => (
+        <span key={team.id} title={team.name}
+              className="shrink min-w-0 truncate max-w-[110px] px-1.5 py-0.5 rounded-md text-[10.5px]
+                         bg-[rgba(59,130,246,.12)] text-[var(--color-accent)]
+                         border border-[rgba(59,130,246,.25)]">
+          {team.name}
+        </span>
+      ))}
+      {rest.length > 0 && (
+        <span title={rest.map(t => t.name).join(', ')}
+              className="shrink-0 px-1.5 py-0.5 rounded-md text-[10.5px] cursor-help
+                         bg-[var(--color-surface)] text-[var(--color-muted)]
+                         border border-[var(--color-border)]">
+          +{rest.length}
+        </span>
+      )}
     </div>
   )
 }
