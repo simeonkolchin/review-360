@@ -113,8 +113,10 @@ body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoot
   background: rgba(6,6,8,.72); backdrop-filter: blur(6px);
   display: flex; justify-content: flex-end;
   padding: clamp(12px, 3vh, 28px);
-  animation: scrimIn .18s ease both;
+  animation: scrimIn .22s ease both;
 }
+.drawer-scrim.closing { animation: scrimOut .24s ease both; }
+@keyframes scrimOut { from { opacity: 1 } to { opacity: 0 } }
 .drawer {
   display: flex; flex-direction: column;
   /* the panel itself never grows past the scrim padding — the list inside scrolls */
@@ -124,11 +126,34 @@ body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoot
   border-radius: 18px;
   box-shadow: -30px 0 70px rgba(0,0,0,.55);
   overflow: hidden;
-  animation: drawerIn .3s cubic-bezier(.2,.8,.3,1) both;
+  animation: drawerIn .34s cubic-bezier(.16,.84,.28,1) both;
 }
+.drawer.closing { animation: drawerOut .26s cubic-bezier(.4,0,.7,.2) both; }
 /* min-height:0 is what actually lets a flex child scroll instead of stretching */
 .drawer-body { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-@keyframes drawerIn { from { transform: translateX(28px); opacity: .3 } to { transform: none; opacity: 1 } }
+@keyframes drawerIn {
+  from { transform: translateX(calc(100% + 28px)); opacity: .5 }
+  to   { transform: none; opacity: 1 }
+}
+@keyframes drawerOut {
+  from { transform: none; opacity: 1 }
+  to   { transform: translateX(calc(100% + 28px)); opacity: .4 }
+}
+
+/* ---------- scrollbars ---------- */
+/* The OS bar is a bright slab on a dark panel — give scroll areas a quiet one. */
+.scroll-slim { scrollbar-width: thin; scrollbar-color: #33343b transparent; }
+.scroll-slim::-webkit-scrollbar { width: 10px; height: 10px; }
+.scroll-slim::-webkit-scrollbar-track { background: transparent; }
+.scroll-slim::-webkit-scrollbar-thumb {
+  background: #2e2f36;
+  border-radius: 999px;
+  /* padding via a transparent border keeps the thumb narrower than the track */
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+.scroll-slim::-webkit-scrollbar-thumb:hover { background: #3d3f48; background-clip: content-box; }
+.scroll-slim::-webkit-scrollbar-corner { background: transparent; }
 
 /* ---------- live state ---------- */
 .pulse-dot { position: relative; }

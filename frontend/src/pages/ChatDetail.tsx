@@ -157,7 +157,7 @@ export default function ChatDetail() {
             просто нажмите на карточку
           </p>
 
-          <div className="flex flex-col gap-2 max-h-[420px] overflow-auto pr-1">
+          <div className="scroll-slim flex flex-col gap-2 max-h-[420px] overflow-auto pr-1">
             {loading && [0, 1, 2].map(i => <div key={i} className="h-[52px] rounded-xl skeleton" />)}
 
             {!loading && members.length === 0 && (

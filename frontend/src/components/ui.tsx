@@ -78,24 +78,33 @@ export function avatarSrc(url?: string | null): string | undefined {
   return url.startsWith('tg:') ? `/api/avatar/${url.slice(3)}` : url
 }
 
-/** Square, rounded chat avatar — the group photo, or its initials on the accent gradient. */
+/** Square chat avatar with soft corners — the group photo, or its initials.
+ *
+ * The radius scales with the box: a fixed `rounded-2xl` turns a 32px avatar
+ * into a circle, which is not what a chat should look like next to round user
+ * avatars.
+ */
 export function ChatAvatar({ name, url, size = 44, ring = false }: {
   name: string; url?: string | null; size?: number; ring?: boolean
 }) {
   const src = avatarSrc(url)
   const ringCls = ring ? 'ring-2 ring-[var(--color-surface)]' : ''
+  const radius = Math.max(7, Math.round(size * 0.26))
   if (src) {
     return (
       <img src={src} alt={name} referrerPolicy="no-referrer"
-        className={`rounded-2xl object-cover shrink-0 ${ringCls}`}
-        style={{ width: size, height: size }} />
+        className={`object-cover shrink-0 ${ringCls}`}
+        style={{ width: size, height: size, borderRadius: radius }} />
     )
   }
   const initials = (name || '?').trim().replace(/[«»]/g, '').split(/\s+/)
     .map(w => w[0]).slice(0, 2).join('').toUpperCase()
   return (
-    <span className={`grid place-items-center rounded-2xl font-semibold text-white shrink-0 ${ringCls}`}
-          style={{ width: size, height: size, fontSize: size * 0.36, background: 'var(--gradient-accent)' }}>
+    <span className={`grid place-items-center font-semibold text-white shrink-0 ${ringCls}`}
+          style={{
+            width: size, height: size, borderRadius: radius,
+            fontSize: size * 0.36, background: 'var(--gradient-accent)',
+          }}>
       {initials}
     </span>
   )
