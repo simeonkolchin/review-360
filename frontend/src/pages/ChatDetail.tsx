@@ -7,7 +7,7 @@ import {
   Pencil,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
-import { useLive } from '../api/live'
+import { useLive, useArrivals } from '../api/live'
 import { useAuthConfig, botLink, peerCounts } from '../api/config'
 import { Avatar, ChatAvatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
@@ -41,6 +41,9 @@ export default function ChatDetail() {
   const teams = teamsLive.data ?? []
   const chat = chatsLive.data?.find(c => String(c.id) === chatId)
   const loading = live.loading
+  // Somebody tapping «Участвую» in the group shows up here on the next poll —
+  // highlighted, so a list that changes under your eyes is not confusing.
+  const arrivals = useArrivals(members.map(m => m.telegram_id))
 
   // team builder
   const [name, setName] = useState('')
@@ -265,7 +268,8 @@ export default function ChatDetail() {
                 className={`draggable flex items-center gap-3 px-3 py-2.5 rounded-xl border
                             bg-[var(--color-surface-2)] border-[var(--color-border)]
                             hover:border-[var(--color-accent)]
-                            ${dragging === m.telegram_id ? 'dragging' : ''}`}>
+                            ${dragging === m.telegram_id ? 'dragging' : ''}
+                            ${arrivals.has(m.telegram_id) ? 'just-arrived' : ''}`}>
                 <GripVertical className="w-4 h-4 text-[var(--color-muted)] shrink-0" />
                 <Avatar name={m.display_name} url={m.photo_url} size={30} />
                 <div className="min-w-0 flex-1">

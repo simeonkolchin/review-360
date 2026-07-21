@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Users, Layers, MessagesSquare, Plus, ArrowRight, ShieldCheck, Zap } from 'lucide-react'
-import { api, type Chat } from '../api/client'
+import { type Chat } from '../api/client'
+import { useLive, useArrivals } from '../api/live'
 import { useAuthConfig, botLink } from '../api/config'
 import { Pill, ChatAvatar } from '../components/ui'
 import Scramble from '../components/Scramble'
@@ -14,16 +14,13 @@ export default function Chats() {
   // dialog — one tap instead of digging through group settings afterwards.
   // Admin status is what lifts privacy mode, so the roster fills from messages.
   const addToGroup = botLink(config?.bot_username ?? '', '?startgroup=true&admin=invite_users')
-  const [chats, setChats] = useState<Chat[]>([])
-  const [stats, setStats] = useState<Stats | null>(null)
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    Promise.all([
-      api.get<Chat[]>('/chats').then(setChats).catch(() => setChats([])),
-      api.get<Stats>('/stats').then(setStats).catch(() => setStats(null)),
-    ]).finally(() => setLoading(false))
-  }, [])
+  // A chat appears here the moment the bot is added to a group — no reload.
+  const chatsLive = useLive<Chat[]>('/chats', 5000)
+  const statsLive = useLive<Stats>('/stats', 15000)
+  const chats = chatsLive.data ?? []
+  const stats = statsLive.data
+  const loading = chatsLive.loading
+  const fresh = useArrivals(chats.map(c => c.id))
 
   const members = chats.reduce((n, c) => n + c.member_count, 0)
   const teams = chats.reduce((n, c) => n + c.team_count, 0)
@@ -133,7 +130,8 @@ export default function Chats() {
         <div className="grid gap-4 stagger" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(280px,1fr))' }}>
           {chats.map((chat, i) => (
             <Link key={chat.id} to={`/chats/${chat.id}`}
-              className="card dotted p-5 no-underline text-[var(--color-text)] lift"
+              className={`card dotted p-5 no-underline text-[var(--color-text)] lift
+                          ${fresh.has(chat.id) ? 'just-arrived' : ''}`}
               style={{ animationDelay: `${i * 60}ms` }}>
               <div className="flex items-center gap-3 mb-3">
                 <ChatAvatar name={chat.title} url={chat.photo_url} size={40} />

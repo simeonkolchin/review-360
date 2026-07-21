@@ -60,3 +60,31 @@ export function useLive<T>(path: string | null, intervalMs = 4000) {
 
   return { data, error, loading, version, refresh: load }
 }
+
+/**
+ * Ids that showed up since the last render — for greeting new arrivals.
+ *
+ * The first batch is not "new": everything is new when a page opens, and
+ * flashing the whole list would say nothing. Only what appears afterwards is
+ * highlighted, and only for a moment.
+ */
+export function useArrivals(ids: (number | string)[], holdMs = 2500) {
+  const seen = useRef<Set<number | string> | null>(null)
+  const [fresh, setFresh] = useState<Set<number | string>>(new Set())
+
+  useEffect(() => {
+    if (seen.current === null) {          // first load — nothing to celebrate
+      seen.current = new Set(ids)
+      return
+    }
+    const added = ids.filter(id => !seen.current!.has(id))
+    if (!added.length) return
+    added.forEach(id => seen.current!.add(id))
+    setFresh(new Set(added))
+    const timer = window.setTimeout(() => setFresh(new Set()), holdMs)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids.join(','), holdMs])
+
+  return fresh
+}
