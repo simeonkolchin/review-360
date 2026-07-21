@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Geist", system-ui, -apple-system, sans-serif;
+  --font-mono: "Geist Mono", ui-monospace, monospace;
+  /* Amber palette: deep navy surfaces + warm amber accent */
+  --color-bg: #0a0a0b;
+  --color-bg-2: #0d0d0f;
+  --color-surface: #131316;
+  --color-surface-2: #17171a;
+  --color-surface-elevated: #1e1e22;
+  --color-border: #26262b;
+  --color-accent: #3b82f6;
+  --color-accent-2: #6366f1;
+  --color-success: #4ade80;
+  --color-warning: #ffb020;
+  --color-danger: #ff4d5e;
+  --color-muted: #8a8f98;
+  --color-text: #edeef0;
+  --color-text-secondary: #8a8f98;
+  --shadow-soft: 0 10px 30px rgba(0,0,0,.4);
+  --shadow-strong: 0 24px 60px rgba(0,0,0,.6);
+  --shadow-accent: 0 12px 30px rgba(59,130,246,.25);
+  --gradient-accent: linear-gradient(135deg, #3b82f6, #6366f1);
+}
+
+* { box-sizing: border-box; }
+html {
+  font-family: var(--font-sans); color: var(--color-text);
+  background: linear-gradient(180deg, var(--color-bg), var(--color-bg-2));
+  background-attachment: fixed;
+}
+body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoothing: antialiased; }
+
+/* ambient blobs */
+.bg-fx { position: fixed; inset: 0; z-index: -1; overflow: hidden; pointer-events: none; }
+.bg-blob { position: absolute; border-radius: 50%; filter: blur(130px); opacity: .28; will-change: transform; }
+.bg-blob--1 { width:50vw;height:50vw;left:-30vw;top:-34vh;
+  background: radial-gradient(circle at 45% 45%, rgba(59,130,246,.45), rgba(59,130,246,.14) 46%, transparent 70%);
+  animation: blob1 22s ease-in-out infinite; }
+.bg-blob--2 { width:46vw;height:46vw;right:-32vw;top:-20vh;
+  background: radial-gradient(circle at 50% 50%, rgba(99,102,241,.40), rgba(99,102,241,.12) 46%, transparent 70%);
+  animation: blob2 27s ease-in-out infinite; }
+.bg-blob--3 { width:48vw;height:48vw;left:34vw;bottom:-42vh;
+  background: radial-gradient(circle at 50% 50%, rgba(37,99,235,.35), rgba(59,130,246,.10) 46%, transparent 70%);
+  animation: blob3 24s ease-in-out infinite; }
+@keyframes blob1 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(12vw,10vh) scale(1.12)} }
+@keyframes blob2 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-10vw,14vh) scale(1.08)} }
+@keyframes blob3 { 0%,100%{transform:translate(0,0) scale(1)} 50%{transform:translate(-8vw,-12vh) scale(1.14)} }
+
+.card { background: var(--color-surface); border: 1px solid var(--color-border);
+  border-radius: 16px; box-shadow: var(--shadow-soft); }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:8px;
+  border-radius:11px; font-weight:600; font-size:14px; cursor:pointer; transition:.18s; border:1px solid transparent; }
+.btn:disabled { opacity:.5; cursor:not-allowed; }
+.btn-primary { background: var(--gradient-accent); color:#ffffff; box-shadow: var(--shadow-accent); }
+.btn-primary:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-ghost { background: transparent; border-color: var(--color-border); color: var(--color-text-secondary); }
+.btn-ghost:hover { color: var(--color-text); border-color: var(--color-accent); }
+.input { width:100%; padding:11px 13px; border-radius:11px; font-family:inherit; font-size:14px;
+  border:1px solid var(--color-border); background: var(--color-surface-2); color: var(--color-text); outline:none; }
+.input:focus { border-color: var(--color-accent); box-shadow: 0 0 0 3px rgba(59,130,246,.15); }
+.fade-up { animation: fadeUp .4s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes fadeUp { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
+.spin { animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* dotted preview surface, as on the reference cards */
+.dotted {
+  background-image: radial-gradient(rgba(255,255,255,.07) 1px, transparent 1px);
+  background-size: 14px 14px;
+}
+
+/* ---------- motion system ---------- */
+/* Every interactive surface answers the pointer; nothing snaps. */
+.btn:active:not(:disabled) { transform: scale(.97); }
+.btn { will-change: transform; }
+
+.page-enter { animation: pageIn .32s cubic-bezier(.2,.7,.3,1) both; }
+@keyframes pageIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+.stagger > * { animation: fadeUp .42s cubic-bezier(.2,.7,.3,1) both; }
+.stagger > *:nth-child(1) { animation-delay: .02s }
+.stagger > *:nth-child(2) { animation-delay: .07s }
+.stagger > *:nth-child(3) { animation-delay: .12s }
+.stagger > *:nth-child(4) { animation-delay: .17s }
+.stagger > *:nth-child(5) { animation-delay: .22s }
+.stagger > *:nth-child(6) { animation-delay: .27s }
+.stagger > *:nth-child(n+7) { animation-delay: .3s }
+
+.lift { transition: transform .2s cubic-bezier(.2,.7,.3,1), border-color .2s, box-shadow .2s; }
+.lift:hover { transform: translateY(-3px); border-color: var(--color-accent); box-shadow: var(--shadow-strong); }
+
+/* ---------- scrim / modal ---------- */
+.scrim {
+  position: fixed; inset: 0; z-index: 80;
+  background: rgba(6,6,8,.72); backdrop-filter: blur(6px);
+  display: grid; place-items: center; padding: 24px;
+  animation: scrimIn .18s ease both;
+}
+@keyframes scrimIn { from { opacity: 0 } to { opacity: 1 } }
+.modal {
+  width: min(560px, 100%); background: var(--color-surface);
+  border: 1px solid var(--color-border); border-radius: 18px;
+  box-shadow: var(--shadow-strong); animation: modalIn .26s cubic-bezier(.2,.8,.3,1) both;
+}
+@keyframes modalIn { from { opacity: 0; transform: translateY(14px) scale(.97) } to { opacity: 1; transform: none } }
+
+/* ---------- drag & drop ---------- */
+.draggable { cursor: grab; transition: transform .16s, opacity .16s, border-color .16s; }
+.draggable:active { cursor: grabbing; }
+.dragging { opacity: .4; transform: scale(.97); }
+.dropzone { transition: border-color .18s, background .18s; }
+.dropzone.over {
+  border-color: var(--color-accent) !important;
+  background: rgba(59,130,246,.07);
+}
+
+/* ---------- misc ---------- */
+.skeleton {
+  background: linear-gradient(90deg, var(--color-surface-2) 25%, #1d1d21 37%, var(--color-surface-2) 63%);
+  background-size: 400% 100%; animation: shimmer 1.4s ease infinite;
+}
+@keyframes shimmer { 0% { background-position: 100% 0 } 100% { background-position: 0 0 } }
+
+/* Tabular glyphs + ligatures off so the churn never changes the line width. */
+.scramble {
+  font-variant-ligatures: none;
+  font-variant-numeric: tabular-nums;
+  white-space: pre;
+}
+.scramble-accent {
+  background: linear-gradient(100deg, var(--color-accent), var(--color-accent-2) 60%, #a78bfa);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+
+/* Big decoding headline on the login screen */
+.hero-line { font-size: clamp(32px, 6.2vw, 74px); line-height: 1.02; letter-spacing: -.035em; font-weight: 600; }
+.caret::after {
+  content: ''; display: inline-block; width: .06em; height: .82em;
+  margin-left: .06em; vertical-align: -.06em; background: var(--color-accent);
+  animation: caret 1.05s steps(1) infinite;
+}
+@keyframes caret { 0%,49%{opacity:1} 50%,100%{opacity:0} }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}

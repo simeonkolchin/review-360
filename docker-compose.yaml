@@ -1,0 +1,75 @@
+services:
+
+  postgres:
+    image: postgres:17-alpine
+    container_name: review360-postgres
+    environment:
+      POSTGRES_USER: ${DB_USER:-review360}
+      POSTGRES_PASSWORD: ${DB_PASS:-review360}
+      POSTGRES_DB: ${DB_NAME:-review360}
+    volumes:
+      - review360_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-review360}"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks: [review360]
+
+  data-service:
+    build:
+      context: ./data-service
+      dockerfile: Dockerfile
+    container_name: review360-data-service
+    env_file: [.env]
+    volumes:
+      - ./data-service/app:/app/app
+      - ./openapi_spec:/app/openapi_spec
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: unless-stopped
+    networks: [review360]
+
+  gateway:
+    build:
+      context: ./gateway
+      dockerfile: Dockerfile
+    container_name: review360-gateway
+    env_file: [.env]
+    volumes:
+      - ./gateway/app:/app/app
+      - ./openapi_spec:/app/openapi_spec
+    depends_on: [data-service]
+    restart: unless-stopped
+    networks: [review360]
+
+  bot:
+    build:
+      context: ./bot
+      dockerfile: Dockerfile
+    container_name: review360-bot
+    env_file: [.env]
+    volumes:
+      - ./bot/app:/app/app
+    depends_on: [gateway]
+    restart: unless-stopped
+    networks: [review360]
+    profiles: ["bot"]      # started only with:  docker compose --profile bot up
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: review360-frontend
+    ports:
+      - "${PUBLIC_PORT:-8080}:80"
+    depends_on: [gateway]
+    restart: unless-stopped
+    networks: [review360]
+
+volumes:
+  review360_pgdata:
+
+networks:
+  review360:
+    driver: bridge

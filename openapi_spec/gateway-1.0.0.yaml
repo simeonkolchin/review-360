@@ -1,0 +1,909 @@
+openapi: 3.1.0
+info:
+  title: Review 360 Gateway
+  description: 'Шлюз Review 360. Единственная публичная точка входа: авторизация через
+    Telegram, команды, раунды оценки, результаты и статистика. Данные хранит data-service,
+    наружу он не выставлен.'
+  version: 1.0.0
+paths:
+  /auth/config:
+    get:
+      tags:
+      - Auth
+      summary: Public auth configuration for the frontend
+      operationId: auth_config_auth_config_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/telegram:
+    post:
+      tags:
+      - Auth
+      summary: Login via Telegram Login Widget
+      operationId: telegram_login_auth_telegram_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TelegramAuthRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/dev-login:
+    post:
+      tags:
+      - Auth
+      summary: Local development login
+      description: 'Bypasses signature verification.
+
+
+        The Telegram Login Widget requires a domain registered with BotFather and
+
+        does not work on localhost, so local runs use this. Disabled unless
+
+        DEV_LOGIN_ENABLED is on.'
+      operationId: dev_login_auth_dev_login_post
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DevLoginRequest'
+        required: true
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/logout:
+    post:
+      tags:
+      - Auth
+      summary: Clear the session cookie
+      operationId: logout_auth_logout_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/me:
+    get:
+      tags:
+      - Auth
+      summary: Current user
+      operationId: me_auth_me_get
+      parameters:
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /auth/login-link:
+    post:
+      tags:
+      - Auth
+      summary: Start login through the Telegram bot
+      description: 'Mint a one-time token and hand back the deep link to open the
+        bot.
+
+
+        This replaces the Telegram Login Widget, which needs a public domain
+
+        registered with BotFather and therefore cannot work on localhost.'
+      operationId: login_link_auth_login_link_post
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+  /auth/login-status:
+    get:
+      tags:
+      - Auth
+      summary: Poll login status
+      description: Polled by the login page; sets the session cookie once confirmed.
+      operationId: login_status_auth_login_status_get
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                anyOf:
+                - $ref: '#/components/schemas/UserResponse'
+                - type: 'null'
+                title: Response Login Status Auth Login Status Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats:
+    get:
+      tags:
+      - API
+      summary: Chats I belong to
+      operationId: list_chats_chats_get
+      parameters:
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/members:
+    get:
+      tags:
+      - API
+      summary: Members who enrolled themselves
+      operationId: list_members_chats__chat_id__members_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/teams:
+    get:
+      tags:
+      - API
+      summary: Teams in a chat
+      operationId: list_teams_chats__chat_id__teams_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - API
+      summary: Create a team
+      operationId: create_team_chats__chat_id__teams_post
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}:
+    delete:
+      tags:
+      - API
+      summary: Delete a team
+      operationId: delete_team_teams__team_id__delete
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}/rounds:
+    post:
+      tags:
+      - API
+      summary: Start a review round
+      description: Creates the round, then announces it in the group with a deep link.
+      operationId: start_round_teams__team_id__rounds_post
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}:
+    get:
+      tags:
+      - API
+      summary: Round progress
+      operationId: get_round_rounds__round_id__get
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}/close:
+    post:
+      tags:
+      - API
+      summary: Close a round
+      operationId: close_round_rounds__round_id__close_post
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}/results:
+    get:
+      tags:
+      - API
+      summary: Aggregated team results
+      operationId: round_results_rounds__round_id__results_get
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /stats:
+    get:
+      tags:
+      - API
+      summary: Usage statistics
+      operationId: stats_stats_get
+      parameters:
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/enroll:
+    post:
+      tags:
+      - Bot
+      summary: Register a user who joined from a group
+      operationId: enroll_bot_enroll_post
+      parameters:
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/tasks:
+    get:
+      tags:
+      - Bot
+      summary: What this user still has to evaluate
+      operationId: tasks_bot_tasks_get
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Token
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/responses:
+    post:
+      tags:
+      - Bot
+      summary: Submit scores for one assignment
+      operationId: responses_bot_responses_post
+      parameters:
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitResponsesRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/results:
+    get:
+      tags:
+      - Bot
+      summary: Own results for display inside the bot
+      operationId: results_bot_results_get
+      parameters:
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/confirm-login:
+    post:
+      tags:
+      - Bot
+      summary: Bot confirms a website login
+      operationId: confirm_login_bot_confirm_login_post
+      parameters:
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health-check endpoint
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+components:
+  schemas:
+    DevLoginRequest:
+      properties:
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Name
+      type: object
+      required:
+      - telegram_id
+      title: DevLoginRequest
+      description: Local development login — no signature check. Disabled in production.
+    EnrollRequest:
+      properties:
+        telegram_chat_id:
+          type: integer
+          title: Telegram Chat Id
+        chat_title:
+          type: string
+          title: Chat Title
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Name
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+        can_dm:
+          type: boolean
+          title: Can Dm
+          default: false
+        is_admin:
+          type: boolean
+          title: Is Admin
+          default: false
+      type: object
+      required:
+      - telegram_chat_id
+      - chat_title
+      - telegram_id
+      title: EnrollRequest
+      description: 'Bot -> backend: a user tapped ''join'' in a group, or started
+        the bot.'
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    ResponseItem:
+      properties:
+        competency_id:
+          type: integer
+          title: Competency Id
+        score:
+          type: integer
+          title: Score
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+      type: object
+      required:
+      - competency_id
+      - score
+      title: ResponseItem
+    SubmitResponsesRequest:
+      properties:
+        assignment_id:
+          type: integer
+          title: Assignment Id
+        responses:
+          items:
+            $ref: '#/components/schemas/ResponseItem'
+          type: array
+          title: Responses
+        comment_only:
+          type: boolean
+          title: Comment Only
+          default: false
+      type: object
+      required:
+      - assignment_id
+      - responses
+      title: SubmitResponsesRequest
+    TeamCreateRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        leader_telegram_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Leader Telegram Id
+        member_telegram_ids:
+          items:
+            type: integer
+          type: array
+          title: Member Telegram Ids
+      type: object
+      required:
+      - name
+      title: TeamCreateRequest
+    TelegramAuthRequest:
+      properties:
+        id:
+          type: integer
+          title: Id
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Name
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+        auth_date:
+          type: integer
+          title: Auth Date
+        hash:
+          type: string
+          title: Hash
+      type: object
+      required:
+      - id
+      - auth_date
+      - hash
+      title: TelegramAuthRequest
+      description: Payload produced by the Telegram Login Widget.
+    UserResponse:
+      properties:
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        display_name:
+          type: string
+          title: Display Name
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+      type: object
+      required:
+      - telegram_id
+      - display_name
+      title: UserResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+tags:
+- name: Auth
+  description: Авторизация через Telegram и сессии
+- name: API
+  description: Чаты, команды, раунды оценки и результаты
+- name: Bot
+  description: Ручки для Telegram-бота (X-Bot-Token)
+- name: Health
+  description: Проверка работоспособности

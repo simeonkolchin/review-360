@@ -1,0 +1,1184 @@
+openapi: 3.1.0
+info:
+  title: Review 360 Data Service
+  description: 'Хранилище Review 360: пользователи, чаты, команды, раунды оценки,
+    ответы и статистика. Доступен только шлюзу по X-Service-Token.'
+  version: 1.0.0
+paths:
+  /users/upsert:
+    post:
+      tags:
+      - Data
+      summary: Upsert User
+      operationId: upsert_user_users_upsert_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /enroll:
+    post:
+      tags:
+      - Data
+      summary: Enroll
+      description: A user tapped 'join' in a group, or opened the bot privately.
+      operationId: enroll_enroll_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EnrollRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats:
+    get:
+      tags:
+      - Data
+      summary: List Chats
+      operationId: list_chats_chats_get
+      parameters:
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatResponse'
+                title: Response List Chats Chats Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/members:
+    get:
+      tags:
+      - Data
+      summary: Chat Members
+      operationId: chat_members_chats__chat_id__members_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/MemberResponse'
+                title: Response Chat Members Chats  Chat Id  Members Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/teams:
+    get:
+      tags:
+      - Data
+      summary: List Teams
+      operationId: list_teams_chats__chat_id__teams_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/TeamResponse'
+                title: Response List Teams Chats  Chat Id  Teams Get
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    post:
+      tags:
+      - Data
+      summary: Create Team
+      operationId: create_team_chats__chat_id__teams_post
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TeamCreateRequest'
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}:
+    delete:
+      tags:
+      - Data
+      summary: Delete Team
+      operationId: delete_team_teams__team_id__delete
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}/rounds:
+    post:
+      tags:
+      - Data
+      summary: Start Round
+      operationId: start_round_teams__team_id__rounds_post
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '201':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundProgressResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}:
+    get:
+      tags:
+      - Data
+      summary: Get Round
+      operationId: get_round_rounds__round_id__get
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundProgressResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}/close:
+    post:
+      tags:
+      - Data
+      summary: Close Round
+      operationId: close_round_rounds__round_id__close_post
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoundProgressResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /rounds/{round_id}/results:
+    get:
+      tags:
+      - Data
+      summary: Round Results
+      operationId: round_results_rounds__round_id__results_get
+      parameters:
+      - name: round_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Round Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TeamResultsResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/tasks:
+    get:
+      tags:
+      - Data
+      summary: Bot Tasks
+      description: What this user still has to fill in for the round behind `token`.
+      operationId: bot_tasks_bot_tasks_get
+      parameters:
+      - name: token
+        in: query
+        required: true
+        schema:
+          type: string
+          title: Token
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotTaskResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/responses:
+    post:
+      tags:
+      - Data
+      summary: Submit Responses
+      operationId: submit_responses_bot_responses_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SubmitResponsesRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/results:
+    get:
+      tags:
+      - Data
+      summary: Bot Results
+      description: Latest closed-round results for a user, for display inside the
+        bot.
+      operationId: bot_results_bot_results_get
+      parameters:
+      - name: telegram_id
+        in: query
+        required: true
+        schema:
+          type: integer
+          title: Telegram Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /events:
+    post:
+      tags:
+      - Data
+      summary: Record Event
+      operationId: record_event_events_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EventRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /stats:
+    get:
+      tags:
+      - Data
+      summary: Stats
+      operationId: stats_stats_get
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /login-tokens:
+    post:
+      tags:
+      - Data
+      summary: Create Login Token
+      operationId: create_login_token_login_tokens_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /login-tokens/confirm:
+    post:
+      tags:
+      - Data
+      summary: Confirm Login Token
+      description: Called by the bot once the user pressed Start on the deep link.
+      operationId: confirm_login_token_login_tokens_confirm_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /login-tokens/consume:
+    post:
+      tags:
+      - Data
+      summary: Consume Login Token
+      description: Polled by the site; returns the user once (then the token is burned).
+      operationId: consume_login_token_login_tokens_consume_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /health:
+    get:
+      tags:
+      - Health
+      summary: Health-check endpoint
+      operationId: health_health_get
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthResponse'
+components:
+  schemas:
+    AssignmentResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        reviewee:
+          $ref: '#/components/schemas/UserResponse'
+        kind:
+          type: string
+          title: Kind
+        completed:
+          type: boolean
+          title: Completed
+      type: object
+      required:
+      - id
+      - reviewee
+      - kind
+      - completed
+      title: AssignmentResponse
+    BotTaskResponse:
+      properties:
+        round_id:
+          type: integer
+          title: Round Id
+        team_name:
+          type: string
+          title: Team Name
+        competencies:
+          items:
+            $ref: '#/components/schemas/CompetencyResponse'
+          type: array
+          title: Competencies
+        assignments:
+          items:
+            $ref: '#/components/schemas/AssignmentResponse'
+          type: array
+          title: Assignments
+      type: object
+      required:
+      - round_id
+      - team_name
+      - competencies
+      - assignments
+      title: BotTaskResponse
+    ChatResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        telegram_chat_id:
+          type: integer
+          title: Telegram Chat Id
+        title:
+          type: string
+          title: Title
+        member_count:
+          type: integer
+          title: Member Count
+        team_count:
+          type: integer
+          title: Team Count
+      type: object
+      required:
+      - id
+      - telegram_chat_id
+      - title
+      - member_count
+      - team_count
+      title: ChatResponse
+    CompetencyResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - id
+      - name
+      title: CompetencyResponse
+    CompetencyScore:
+      properties:
+        competency_id:
+          type: integer
+          title: Competency Id
+        competency:
+          type: string
+          title: Competency
+        self_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Self Score
+        peer_average:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Peer Average
+        leader_score:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Leader Score
+        responses_count:
+          type: integer
+          title: Responses Count
+          default: 0
+        hidden_for_anonymity:
+          type: boolean
+          title: Hidden For Anonymity
+          default: false
+      type: object
+      required:
+      - competency_id
+      - competency
+      title: CompetencyScore
+    EnrollRequest:
+      properties:
+        telegram_chat_id:
+          type: integer
+          title: Telegram Chat Id
+        chat_title:
+          type: string
+          title: Chat Title
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        first_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: First Name
+        last_name:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Last Name
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+        can_dm:
+          type: boolean
+          title: Can Dm
+          default: false
+        is_admin:
+          type: boolean
+          title: Is Admin
+          default: false
+      type: object
+      required:
+      - telegram_chat_id
+      - chat_title
+      - telegram_id
+      title: EnrollRequest
+      description: 'Bot -> backend: a user tapped ''join'' in a group, or started
+        the bot.'
+    EventRequest:
+      properties:
+        kind:
+          type: string
+          title: Kind
+        telegram_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Telegram Id
+        chat_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Chat Id
+        payload:
+          anyOf:
+          - additionalProperties: true
+            type: object
+          - type: 'null'
+          title: Payload
+      type: object
+      required:
+      - kind
+      title: EventRequest
+      description: Activity record written by the gateway for usage statistics.
+    HTTPValidationError:
+      properties:
+        detail:
+          items:
+            $ref: '#/components/schemas/ValidationError'
+          type: array
+          title: Detail
+      type: object
+      title: HTTPValidationError
+    HealthResponse:
+      properties:
+        message:
+          type: string
+          title: Message
+        errors:
+          anyOf:
+          - items:
+              type: string
+            type: array
+          - type: 'null'
+          title: Errors
+      type: object
+      required:
+      - message
+      title: HealthResponse
+    MemberResponse:
+      properties:
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        display_name:
+          type: string
+          title: Display Name
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+        can_dm:
+          type: boolean
+          title: Can Dm
+          default: false
+        is_admin:
+          type: boolean
+          title: Is Admin
+          default: false
+      type: object
+      required:
+      - telegram_id
+      - display_name
+      title: MemberResponse
+    ResponseItem:
+      properties:
+        competency_id:
+          type: integer
+          title: Competency Id
+        score:
+          type: integer
+          title: Score
+        comment:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Comment
+      type: object
+      required:
+      - competency_id
+      - score
+      title: ResponseItem
+    RoundProgressResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        team_id:
+          type: integer
+          title: Team Id
+        team_name:
+          type: string
+          title: Team Name
+        status:
+          type: string
+          title: Status
+        token:
+          type: string
+          title: Token
+        bot_deep_link:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Bot Deep Link
+        total_assignments:
+          type: integer
+          title: Total Assignments
+        completed_assignments:
+          type: integer
+          title: Completed Assignments
+        participants_done:
+          type: integer
+          title: Participants Done
+        participants_total:
+          type: integer
+          title: Participants Total
+      type: object
+      required:
+      - id
+      - team_id
+      - team_name
+      - status
+      - token
+      - total_assignments
+      - completed_assignments
+      - participants_done
+      - participants_total
+      title: RoundProgressResponse
+    SubmitResponsesRequest:
+      properties:
+        assignment_id:
+          type: integer
+          title: Assignment Id
+        responses:
+          items:
+            $ref: '#/components/schemas/ResponseItem'
+          type: array
+          title: Responses
+        comment_only:
+          type: boolean
+          title: Comment Only
+          default: false
+      type: object
+      required:
+      - assignment_id
+      - responses
+      title: SubmitResponsesRequest
+    TeamCreateRequest:
+      properties:
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        leader_telegram_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Leader Telegram Id
+        member_telegram_ids:
+          items:
+            type: integer
+          type: array
+          title: Member Telegram Ids
+      type: object
+      required:
+      - name
+      title: TeamCreateRequest
+    TeamResponse:
+      properties:
+        id:
+          type: integer
+          title: Id
+        name:
+          type: string
+          title: Name
+        leader:
+          anyOf:
+          - $ref: '#/components/schemas/UserResponse'
+          - type: 'null'
+        members:
+          items:
+            $ref: '#/components/schemas/UserResponse'
+          type: array
+          title: Members
+          default: []
+        active_round_id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Active Round Id
+      type: object
+      required:
+      - id
+      - name
+      title: TeamResponse
+    TeamResultsResponse:
+      properties:
+        round_id:
+          type: integer
+          title: Round Id
+        team_name:
+          type: string
+          title: Team Name
+        status:
+          type: string
+          title: Status
+        competencies:
+          items:
+            $ref: '#/components/schemas/CompetencyResponse'
+          type: array
+          title: Competencies
+        members:
+          items:
+            $ref: '#/components/schemas/UserResultResponse'
+          type: array
+          title: Members
+      type: object
+      required:
+      - round_id
+      - team_name
+      - status
+      - competencies
+      - members
+      title: TeamResultsResponse
+    UserResponse:
+      properties:
+        telegram_id:
+          type: integer
+          title: Telegram Id
+        username:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Username
+        display_name:
+          type: string
+          title: Display Name
+        photo_url:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Photo Url
+      type: object
+      required:
+      - telegram_id
+      - display_name
+      title: UserResponse
+    UserResultResponse:
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        round_id:
+          type: integer
+          title: Round Id
+        scores:
+          items:
+            $ref: '#/components/schemas/CompetencyScore'
+          type: array
+          title: Scores
+        overall_self:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Overall Self
+        overall_peer:
+          anyOf:
+          - type: number
+          - type: 'null'
+          title: Overall Peer
+        comments:
+          items:
+            type: string
+          type: array
+          title: Comments
+          default: []
+        is_available:
+          type: boolean
+          title: Is Available
+          default: true
+        message:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Message
+      type: object
+      required:
+      - user
+      - round_id
+      - scores
+      title: UserResultResponse
+    ValidationError:
+      properties:
+        loc:
+          items:
+            anyOf:
+            - type: string
+            - type: integer
+          type: array
+          title: Location
+        msg:
+          type: string
+          title: Message
+        type:
+          type: string
+          title: Error Type
+      type: object
+      required:
+      - loc
+      - msg
+      - type
+      title: ValidationError
+tags:
+- name: Data
+  description: CRUD и агрегация данных оценки
+- name: Health
+  description: Проверка работоспособности сервиса и БД
