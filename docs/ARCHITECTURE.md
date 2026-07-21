@@ -12,28 +12,51 @@ How the pieces fit, and why they were split that way.
 | `gateway` | 8010 | no | Public API. Sessions, authorisation, statistics |
 | `data-service` | 8011 | no | The only service with database access. Scoring, anonymity |
 | `bot` | — | no | aiogram 3, long polling. No inbound port at all |
-| `postgres` | 5432 | no | PostgreSQL 17 |
+| `postgres` | 5432 | no | PostgreSQL 16 |
 
 Everything sits on one Docker network. Only the project nginx is reachable from
 outside, and in production even that is behind the shared edge proxy.
 
 ## Request paths
 
-**Browser**
+```mermaid
+sequenceDiagram
+    autonumber
+    participant B as 🌐 Browser
+    participant N as nginx
+    participant G as gateway
+    participant D as data-service
+    participant P as 🐘 postgres
 
-```
-browser → nginx :80
-          ├─ /            static React build
-          └─ /api/*  →  gateway :8010
-                        ↳ cookie → JWT → get_current_user_id()
-                        ↳ X-Service-Token → data-service :8011 → postgres
+    B->>N: GET /api/rounds/12/results<br/>Cookie: review360_token
+    N->>G: proxy /rounds/12/results
+    G->>G: decode JWT → get_current_user_id()
+    G->>D: GET /rounds/12/results<br/>X-Service-Token
+    D->>P: SELECT responses, assignments
+    P-->>D: rows
+    D->>D: aggregate · apply anonymity threshold
+    D-->>G: averages only, never individual peer scores
+    G->>D: POST /events (statistics)
+    G-->>B: JSON
 ```
 
-**Bot**
+```mermaid
+sequenceDiagram
+    autonumber
+    participant T as ✈️ Telegram
+    participant O as 🤖 bot
+    participant G as gateway
+    participant D as data-service
 
-```
-Telegram ⇄ bot (long polling)
-             ↳ X-Bot-Token → gateway /bot/* → data-service → postgres
+    T->>O: getUpdates (long polling)
+    O->>G: GET /bot/tasks?telegram_id=…<br/>X-Bot-Token
+    G->>D: fetch assignments (X-Service-Token)
+    D-->>G: what this person still has to rate
+    G-->>O: assignments + competencies
+    O->>T: photo of the reviewee + score buttons
+    T->>O: callback score:…
+    O->>G: POST /bot/responses
+    G->>D: store scores, then the free-text note
 ```
 
 The bot never touches the database and never mints a session. It authenticates
@@ -41,6 +64,25 @@ to the gateway with a shared token and passes the Telegram user id along; the
 gateway decides what that user is allowed to see.
 
 ## Trust boundaries
+
+```mermaid
+flowchart LR
+    B["🌐 Browser"] -->|"JWT cookie<br/><sub>«I am this Telegram user»</sub>"| G
+    O["🤖 bot"] -->|"X-Bot-Token<br/><sub>«I am our bot, acting for this id»</sub>"| G
+    G["🚪 gateway"] -->|"X-Service-Token<br/><sub>«request already authorised»</sub>"| D["🧮 data-service"]
+    D --> P[("🐘 postgres")]
+    B -. "no path" .-x D
+    O -. "no path" .-x P
+
+    classDef ext fill:#1b2a3a,stroke:#2CA5E0,color:#e8eef6
+    classDef gw fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef ds fill:#1d2333,stroke:#6366f1,color:#e8eef6
+    classDef db fill:#16241f,stroke:#4ade80,color:#e8eef6
+    class B,O ext
+    class G gw
+    class D ds
+    class P db
+```
 
 Three distinct secrets, three distinct boundaries:
 
@@ -69,18 +111,70 @@ things worth the extra process:
 
 ## Data model
 
-```
-TgUser        telegram_id, username, first/last name, photo_url
-Chat          telegram_chat_id, title, added_by → TgUser
-Membership    chat ↔ tg_user, can_dm, is_admin      (self-enrolment)
-Team          chat, name, leader → TgUser
-TeamMember    team ↔ tg_user
-Competency    name, description, position           (five seeded)
-ReviewRound   team, status draft|active|closed, token, deep link
-Assignment    round, reviewer → TgUser, reviewee → TgUser, kind self|peer|leader
-Response      assignment, competency, score 1..5, comment
-LoginToken    token, telegram_id, confirmed, consumed, expires_at
-Event         kind, telegram_id, chat_id, payload    (usage statistics)
+```mermaid
+erDiagram
+    TGUSER ||--o{ MEMBERSHIP : "self-enrolled"
+    CHAT   ||--o{ MEMBERSHIP : has
+    CHAT   ||--o{ TEAM : contains
+    TEAM   ||--o{ TEAMMEMBER : has
+    TGUSER ||--o{ TEAMMEMBER : "belongs to"
+    TEAM   ||--o{ REVIEWROUND : runs
+    REVIEWROUND ||--o{ ASSIGNMENT : "n² of them"
+    ASSIGNMENT  ||--o{ RESPONSE : collects
+    COMPETENCY  ||--o{ RESPONSE : "scored on"
+    TGUSER ||--o{ LOGINTOKEN : "logs in with"
+    TGUSER ||--o{ EVENT : "generates"
+
+    TGUSER {
+        bigint telegram_id PK
+        string username
+        string first_name
+        string last_name
+        string photo_url
+    }
+    CHAT {
+        bigint telegram_chat_id
+        string title
+        bigint added_by_id FK
+    }
+    MEMBERSHIP {
+        bool can_dm
+        bool is_admin
+    }
+    TEAM {
+        string name
+        bigint leader_id FK
+    }
+    REVIEWROUND {
+        enum status "draft|active|closed"
+        string token
+        string bot_deep_link
+    }
+    ASSIGNMENT {
+        bigint reviewer_id FK
+        bigint reviewee_id FK
+        enum kind "self|peer|leader"
+        bool completed
+    }
+    RESPONSE {
+        int score "1..5"
+        string comment
+    }
+    COMPETENCY {
+        string name
+        string description
+        int position
+    }
+    LOGINTOKEN {
+        string token
+        bool confirmed
+        bool consumed
+        datetime expires_at
+    }
+    EVENT {
+        string kind
+        json payload
+    }
 ```
 
 A round for a team of *n* members creates *n²* assignments: each member gets one
@@ -97,6 +191,28 @@ the identity map first, so the `selectin` loaders actually run instead of
 handing back a stale instance with unloaded relations.
 
 ## Aggregation
+
+```mermaid
+flowchart TD
+    R[("Response rows<br/>for one person")] --> S{"assignment kind?"}
+    S -->|self| SS["self_score"]
+    S -->|leader| LS["leader_score"]
+    S -->|peer| CNT{"≥ MIN_RESPONSES<br/>peers answered?"}
+    CNT -->|"yes"| PA["peer_average"]
+    CNT -->|"no"| HID["null +<br/>hidden_for_anonymity"]
+    R --> CM{"note left?"} -->|yes| CS["shuffle · strip author"] --> CNT2{"same threshold"} --> OUT
+    SS --> OUT["UserResult"]
+    LS --> OUT
+    PA --> OUT
+    HID --> OUT
+
+    classDef ok fill:#16241f,stroke:#4ade80,color:#e8eef6
+    classDef hide fill:#2a1c22,stroke:#ff4d5e,color:#f6e8ea
+    classDef n fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    class SS,LS,PA,CS ok
+    class HID hide
+    class R,S,CNT,CM,CNT2,OUT n
+```
 
 `data-service/app/engine/aggregation.py` builds every result:
 

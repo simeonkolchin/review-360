@@ -12,7 +12,7 @@
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0?logo=telegram&logoColor=white)](https://aiogram.dev/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-17-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-4169E1?logo=postgresql&logoColor=white)](https://www.postgresql.org/)
 [![Docker](https://img.shields.io/badge/Docker-compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
@@ -62,21 +62,36 @@ And the number that matters is never the average. It is the **gap between self-a
 
 ## 🔄 How it works
 
-```
-  ┌── Telegram group ──────────────┐          ┌── Web ──────────────────┐
-  │  /enroll → "Участвую" button   │          │  log in through the bot │
-  │  people opt in themselves      │─────────▶│  drag members into      │
-  │  bot learns who they are       │          │  teams, pick a leader   │
-  └────────────────────────────────┘          │  press "Запустить"      │
-                 ▲                            └───────────┬─────────────┘
-                 │  bot posts in the group,               │
-                 │  tags everyone, hands out              │
-                 │  personal deep links                   ▼
-  ┌── Telegram DM ─────────────────┐          ┌── Dashboard ────────────┐
-  │  photo of the person being     │          │  radar per person,      │
-  │  rated + 1–5 per competency    │─────────▶│  self vs team,          │
-  │  then an anonymous note        │          │  anonymous comments     │
-  └────────────────────────────────┘          └─────────────────────────┘
+```mermaid
+flowchart LR
+    subgraph TG["💬 Telegram group"]
+        A["Bot joins the chat"] --> B["/enroll → «Участвую»<br/>people opt in themselves"]
+    end
+
+    subgraph WEB["🖥️ Web"]
+        C["Log in through the bot<br/>one-time deep link"] --> D["Drag members into teams<br/>crown the leader"]
+        D --> E["Press «Запустить»"]
+    end
+
+    subgraph DM["📩 Telegram DM"]
+        F["Photo of the person<br/>being rated"] --> G["1–5 per competency"]
+        G --> H["Anonymous free-text note"]
+    end
+
+    subgraph RES["📊 Results"]
+        I["Radar per person<br/>self vs team"] --> J["Anonymous comments<br/>≥3 answers only"]
+    end
+
+    B --> C
+    E -- "bot tags everyone,<br/>hands out personal links" --> F
+    H --> I
+
+    classDef tg fill:#1b2a3a,stroke:#2CA5E0,color:#e8eef6
+    classDef web fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef res fill:#1d2a22,stroke:#4ade80,color:#e8eef6
+    class A,B,F,G,H tg
+    class C,D,E web
+    class I,J res
 ```
 
 Every round creates three kinds of assignment per member: **self**, **peer** (everyone else), and **leader** — the leader's view is stored separately so it never dilutes the peer average, because one strong opinion from above is not the same signal as the team's.
@@ -96,30 +111,34 @@ The same mechanism powers **login**. The site has no Telegram Login Widget — i
 
 Four services behind a single nginx entry point. Nothing except nginx is exposed.
 
-```
-                    ┌──────────────────────────────────────────┐
-   browser ───────▶ │  nginx                                   │
-                    │  /       → React SPA (static build)      │
-                    │  /api/*  → gateway                       │
-                    └────────────────┬─────────────────────────┘
-                                     │
-   Telegram ──▶ bot ─────────────────┤  X-Bot-Token
-   (aiogram long polling)            ▼
-                    ┌──────────────────────────────────────────┐
-                    │  gateway  :8010                          │
-                    │  who you are: JWT in an httpOnly cookie, │
-                    │  every route behind a dependency,        │
-                    │  an event written for every action       │
-                    └────────────────┬─────────────────────────┘
-                                     │  X-Service-Token
-                                     ▼
-                    ┌──────────────────────────────────────────┐
-                    │  data-service  :8011                     │
-                    │  what is true: the only service with     │
-                    │  database access; scoring and anonymity  │
-                    └────────────────┬─────────────────────────┘
-                                     ▼
-                              PostgreSQL 17
+```mermaid
+flowchart TD
+    U["🌐 Browser"] --> NG
+    T["✈️ Telegram"] <--> BOT["🤖 bot<br/><sub>aiogram 3 · long polling</sub>"]
+
+    subgraph EDGE[" "]
+        NG["nginx<br/><sub>/ → React SPA · /api/* → gateway</sub>"]
+    end
+
+    NG -->|"session cookie"| GW
+    BOT -->|"X-Bot-Token"| GW
+
+    GW["🚪 gateway :8010<br/><sub><b>who you are</b> — JWT in an httpOnly cookie,<br/>every route behind a dependency,<br/>an event written for every action</sub>"]
+    GW -->|"X-Service-Token"| DS
+
+    DS["🧮 data-service :8011<br/><sub><b>what is true</b> — the only service with database<br/>access; scoring and the anonymity rule</sub>"]
+    DS --> DB[("🐘 PostgreSQL")]
+
+    classDef edge fill:#171a21,stroke:#3f4654,color:#e8eef6
+    classDef gw fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef ds fill:#1d2333,stroke:#6366f1,color:#e8eef6
+    classDef ext fill:#1b2a3a,stroke:#2CA5E0,color:#e8eef6
+    classDef db fill:#16241f,stroke:#4ade80,color:#e8eef6
+    class NG edge
+    class GW gw
+    class DS ds
+    class U,T,BOT ext
+    class DB db
 ```
 
 **Why split the gateway from the data-service?** Because the anonymity rule has to live in exactly one place. The gateway owns identity — sessions, cookies, statistics. The data-service owns truth — schema, aggregation, the minimum-responses threshold. Neither the browser nor the bot can reach the data layer without the service token, so there is no path that returns an individual peer score, whatever the caller asks for.
@@ -228,9 +247,26 @@ make help        # every target
 
 The live instance runs at **[tgreview360.ru](https://tgreview360.ru)** on a Docker host behind a shared nginx edge proxy:
 
-```
-Internet :443 ──▶ edge-proxy (SNI routing) ──▶ TLS termination for tgreview360.ru
-                                          └──▶ review360-frontend:80 ──▶ gateway ──▶ data-service ──▶ postgres
+```mermaid
+flowchart LR
+    NET["🌍 Internet<br/><sub>:80 · :443</sub>"] --> EP
+
+    subgraph HOST["🖧 Docker host"]
+        EP["edge-proxy<br/><sub>SNI routing · shared by every project</sub>"]
+        EP -->|"tgreview360.ru<br/>TLS termination"| FE["review360-frontend<br/><sub>nginx :80</sub>"]
+        EP -.->|"other domains"| OTHER["other projects"]
+        FE --> GW["gateway"] --> DS["data-service"] --> PG[("postgres")]
+        BOT["bot<br/><sub>long polling — no inbound port</sub>"] --> GW
+    end
+
+    LE["🔒 Let's Encrypt<br/><sub>ACME webroot on :80</sub>"] -.->|"certificate"| EP
+
+    classDef net fill:#171a21,stroke:#3f4654,color:#e8eef6
+    classDef app fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef dim fill:#15171d,stroke:#31363f,color:#9aa3b2
+    class NET,EP net
+    class FE,GW,DS,BOT app
+    class OTHER,LE,PG dim
 ```
 
 - Let's Encrypt certificates, issued over the ACME webroot the edge proxy serves on port 80 and renewed on a timer.
@@ -264,13 +300,28 @@ Generated specs: [`openapi_spec/`](openapi_spec/).
 
 ## 🗄️ Data model
 
-```
-TgUser ──┬── Membership ── Chat ──── Team ──┬── TeamMember ── TgUser
-         │                                  │
-         │                                  └── ReviewRound ── Assignment ── Response
-         └── LoginToken                          draft/active/closed   reviewer → reviewee
-                                                                       kind: self | peer | leader
-Competency        Event  (every gateway action is recorded for statistics)
+```mermaid
+erDiagram
+    TGUSER ||--o{ MEMBERSHIP : "enrolled in"
+    CHAT   ||--o{ MEMBERSHIP : has
+    CHAT   ||--o{ TEAM : contains
+    TEAM   ||--o{ TEAMMEMBER : has
+    TGUSER ||--o{ TEAMMEMBER : "belongs to"
+    TEAM   ||--o{ REVIEWROUND : "runs"
+    REVIEWROUND ||--o{ ASSIGNMENT : "creates n²"
+    ASSIGNMENT  ||--o{ RESPONSE : "collects"
+    COMPETENCY  ||--o{ RESPONSE : "scored on"
+    TGUSER ||--o{ LOGINTOKEN : "logs in with"
+
+    TGUSER { bigint telegram_id string username string photo_url }
+    CHAT { bigint telegram_chat_id string title }
+    MEMBERSHIP { bool can_dm bool is_admin }
+    TEAM { string name bigint leader_id }
+    REVIEWROUND { enum status string token }
+    ASSIGNMENT { enum kind "self|peer|leader" }
+    RESPONSE { int score "1..5" string comment }
+    COMPETENCY { string name int position }
+    LOGINTOKEN { bool confirmed bool consumed datetime expires_at }
 ```
 
 `Assignment` is the unit of work: one reviewer, one reviewee, one kind. A round for a team of *n* creates *n²* assignments — everyone rates everyone, including themselves.
