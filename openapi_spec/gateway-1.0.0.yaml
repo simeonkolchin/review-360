@@ -912,6 +912,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /bot/migrate:
+    post:
+      tags:
+      - Bot
+      summary: A group was upgraded to a supergroup
+      operationId: migrate_bot_migrate_post
+      parameters:
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /bot/reachable:
     post:
       tags:

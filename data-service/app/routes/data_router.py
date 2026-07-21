@@ -190,6 +190,42 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
     return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
 
 
+@router.post("/chats/migrate", dependencies=[Depends(require_service_token)])
+async def migrate_chat(payload: dict, session: AsyncSession = Depends(get_session)):
+    """Follow a group that Telegram upgraded to a supergroup.
+
+    The upgrade hands the chat a brand new id and retires the old one, so every
+    row we keep has to move across or the chat silently stops working.
+    """
+    old_id = int(payload["from_chat_id"])
+    new_id = int(payload["to_chat_id"])
+    if old_id == new_id:
+        return {"migrated": False}
+
+    chat = await session.scalar(select(Chat).where(Chat.telegram_chat_id == old_id))
+    if chat is None:
+        return {"migrated": False}
+
+    existing = await session.scalar(select(Chat).where(Chat.telegram_chat_id == new_id))
+    if existing is not None and existing.id != chat.id:
+        # Both ids ended up in the database — keep the older row, which owns the
+        # teams and history, and fold the newer one into it.
+        known = {m.tg_user_id for m in chat.memberships}
+        for membership in list(existing.memberships):
+            if membership.tg_user_id in known:
+                await session.delete(membership)
+            else:
+                membership.chat_id = chat.id
+        await session.flush()
+        await session.delete(existing)
+
+    chat.telegram_chat_id = new_id
+    if payload.get("title"):
+        chat.title = payload["title"]
+    await session.commit()
+    return {"migrated": True, "chat_id": chat.id, "telegram_chat_id": new_id}
+
+
 @router.post("/chats/{chat_id}/photo", dependencies=[Depends(require_service_token)])
 async def set_chat_photo(chat_id: int, payload: dict, session: AsyncSession = Depends(get_session)):
     """Store the group photo the gateway noticed on Telegram."""

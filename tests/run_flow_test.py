@@ -152,6 +152,28 @@ def main() -> int:
     check("all 4 enrolled members returned", status == 200 and len(members) == 4,
           f"got={len(members) if status == 200 else status}")
 
+    print("\n4b. A group upgraded to a supergroup keeps its data")
+    # Telegram silently swaps a group's id when it becomes a supergroup — which
+    # happens on ordinary actions like making the history visible.
+    upgraded_id = -1009009009009
+    status, moved = client.call(
+        "POST", "/bot/migrate",
+        {"from_chat_id": CHAT_ID, "to_chat_id": upgraded_id, "title": "Тестовая команда"},
+        bot=True,
+    )
+    check("chat followed to the new id", status == 200 and moved.get("migrated"),
+          f"status={status} {moved}")
+    status, chats_after = client.call("GET", "/chats")
+    same = next((c for c in chats_after if c["id"] == chat["id"]), None)
+    check("same chat, new telegram id",
+          same is not None and same["telegram_chat_id"] == upgraded_id,
+          f"got={same['telegram_chat_id'] if same else None}")
+    check("members survived the move", status == 200 and same and same["member_count"] == 4,
+          f"got={same['member_count'] if same else None}")
+    # move it back so the rest of the flow (and re-runs) work on the usual id
+    client.call("POST", "/bot/migrate",
+                {"from_chat_id": upgraded_id, "to_chat_id": CHAT_ID}, bot=True)
+
     print("\n5. Create a team")
     status, team = client.call(
         "POST",

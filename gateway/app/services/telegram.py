@@ -45,7 +45,8 @@ async def fetch_file(file_path: str) -> tuple[bytes, str] | None:
         return None
 
 
-async def _call(method: str, payload: dict | None = None):
+async def _api(method: str, payload: dict | None = None) -> dict | None:
+    """Raw Bot API call — the whole envelope, errors included."""
     if not TELEGRAM_BOT_TOKEN:
         return None
     try:
@@ -53,11 +54,26 @@ async def _call(method: str, payload: dict | None = None):
             response = await client.post(
                 f"{API_BASE}/bot{TELEGRAM_BOT_TOKEN}/{method}", json=payload or {}
             )
-        data = response.json()
-        return data.get("result") if data.get("ok") else None
+        return response.json()
     except Exception as exc:
         logger.warning("%s error: %s", method, exc)
         return None
+
+
+async def _call(method: str, payload: dict | None = None):
+    data = await _api(method, payload)
+    return data.get("result") if data and data.get("ok") else None
+
+
+def migration_target(data: dict | None) -> int | None:
+    """The new chat id Telegram hands back when a group became a supergroup.
+
+    Upgrading a group changes its id, and every call with the old one fails
+    with this pointer — following it is the only way not to lose the chat.
+    """
+    if not data or data.get("ok"):
+        return None
+    return (data.get("parameters") or {}).get("migrate_to_chat_id")
 
 
 async def chat_status(chat_id: int) -> dict:
@@ -67,7 +83,15 @@ async def chat_status(chat_id: int) -> dict:
     whether we are an administrator — which together explain why the roster on
     the site may be shorter than the group really is.
     """
-    status: dict = {"member_count": None, "bot_is_admin": None, "photo_url": None}
+    status: dict = {
+        "member_count": None, "bot_is_admin": None, "photo_url": None, "migrate_to": None,
+    }
+
+    probe = await _api("getChat", {"chat_id": chat_id})
+    moved = migration_target(probe)
+    if moved:
+        status["migrate_to"] = moved
+        return status
 
     total = await _call("getChatMemberCount", {"chat_id": chat_id})
     if isinstance(total, int):
@@ -82,8 +106,8 @@ async def chat_status(chat_id: int) -> dict:
             status["bot_is_admin"] = membership.get("status") in {"administrator", "creator"}
 
     # Groups often get their photo after the bot joins — pick it up on the way past.
-    chat = await _call("getChat", {"chat_id": chat_id})
-    photo = (chat or {}).get("photo", {}).get("small_file_id")
+    chat = (probe or {}).get("result") or {}
+    photo = (chat.get("photo") or {}).get("small_file_id")
     if photo:
         file = await _call("getFile", {"file_id": photo})
         if file and file.get("file_path"):

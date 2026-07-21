@@ -23,6 +23,11 @@ async def leave(payload: dict):
     return await data_client.post("/leave", json=payload)
 
 
+@router.post("/migrate", summary="A group was upgraded to a supergroup")
+async def migrate(payload: dict):
+    return await data_client.post("/chats/migrate", json=payload)
+
+
 @router.post("/reachable", summary="This user has opened the bot, so we may DM them")
 async def reachable(payload: dict):
     return await data_client.post("/reachable", json=payload)

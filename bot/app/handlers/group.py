@@ -82,6 +82,23 @@ async def _sync_admins(bot: Bot, chat) -> int:
     return count
 
 
+@router.message(F.migrate_to_chat_id)
+async def upgraded_away(message: Message) -> None:
+    """Last message in the old group: it has become a supergroup."""
+    await gateway.migrate_chat(
+        message.chat.id, message.migrate_to_chat_id, message.chat.title
+    )
+
+
+@router.message(F.migrate_from_chat_id)
+async def upgraded_here(message: Message) -> None:
+    """First message in the new supergroup — same group, new id."""
+    await gateway.migrate_chat(
+        message.migrate_from_chat_id, message.chat.id, message.chat.title
+    )
+    await _sync_admins(message.bot, message.chat)
+
+
 @router.message(F.new_chat_members)
 async def members_added(message: Message) -> None:
     """The bot was added — or someone else was."""

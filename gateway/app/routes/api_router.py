@@ -93,6 +93,14 @@ async def chat_telegram_status(chat_id: int, telegram_id: int = Depends(get_curr
 
     info = await chat_status(chat["telegram_chat_id"])
 
+    # The group became a supergroup and changed id — follow it, then ask again.
+    if info.get("migrate_to"):
+        await data_client.post("/chats/migrate", json={
+            "from_chat_id": chat["telegram_chat_id"],
+            "to_chat_id": info["migrate_to"],
+        })
+        info = await chat_status(info["migrate_to"])
+
     # The group photo is usually set after the bot joins; save it when it shows up.
     if info["photo_url"] and info["photo_url"] != chat.get("photo_url"):
         await data_client.post(

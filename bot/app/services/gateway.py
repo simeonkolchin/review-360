@@ -58,6 +58,15 @@ async def forget(chat_id: int, telegram_id: int):
     )
 
 
+async def migrate_chat(from_chat_id: int, to_chat_id: int, title: str | None = None):
+    """Telegram upgraded a group to a supergroup: it now has a different id."""
+    return await _request(
+        "POST",
+        "/bot/migrate",
+        json={"from_chat_id": from_chat_id, "to_chat_id": to_chat_id, "title": title},
+    )
+
+
 async def mark_reachable(user):
     """Record that this person has opened the bot, so we may DM them."""
     return await _request(

@@ -73,6 +73,46 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/migrate:
+    post:
+      tags:
+      - Data
+      summary: Migrate Chat
+      description: 'Follow a group that Telegram upgraded to a supergroup.
+
+
+        The upgrade hands the chat a brand new id and retires the old one, so every
+
+        row we keep has to move across or the chat silently stops working.'
+      operationId: migrate_chat_chats_migrate_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats/{chat_id}/photo:
     post:
       tags:
