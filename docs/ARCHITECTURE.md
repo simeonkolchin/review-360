@@ -236,11 +236,6 @@ from three sources, none of which needs the user to press anything:
 | `chat_member` updates | anyone joining or leaving while the bot is present |
 | any group message | the author — in practice this is what fills the list |
 
-`can_dm` is separate and stricter: it flips only when the person opens a private
-chat with the bot, because that is the moment Telegram lets us message them. The
-round announcement carries a personal deep link precisely to trigger it, and the
-dashboard flags anyone still unreachable.
-
 ## Aggregation
 
 ```mermaid

@@ -13,7 +13,7 @@ SCORE_LABELS = {1: "1 · слабо", 2: "2", 3: "3 · норма", 4: "4", 5: "
 
 def enroll_keyboard(count: int = 0) -> InlineKeyboardMarkup:
     """Join button carrying its own tally, so the group sees it filling up."""
-    label = "✋ Участвую" if not count else f"✋ Участвую · {count}"
+    label = "Участвую" if not count else f"Участвую · {count}"
     return InlineKeyboardMarkup(
         inline_keyboard=[[InlineKeyboardButton(text=label, callback_data="enroll")]]
     )

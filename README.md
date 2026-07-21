@@ -52,7 +52,7 @@ The instrument is fine. The delivery kills it.
 
 Run the whole thing **where the team already talks**. No accounts, no invitation emails, no forms — a Telegram group, a button, and about five minutes per person.
 
-1. The bot joins the work chat and **picks the roster up by itself** — admins, joins, and anyone who writes.
+1. The bot joins the work chat; people tap **Участвую** — and admins, joins and anyone who writes are picked up anyway.
 2. Teams are assembled on the web by **dragging** members into a team and putting a crown on the leader.
 3. One press of *Start* and the bot tags everyone in the group, handing each person a **personal deep link**.
 4. Each participant answers **in their own DM**, inside a single message that keeps being edited — the reviewee's photo above the question, no wall of messages.
@@ -65,7 +65,7 @@ And the number that matters is never the average. It is the **gap between self-a
 ```mermaid
 flowchart LR
     subgraph TG["💬 Telegram group"]
-        A["Bot joins the chat"] --> B["Roster assembles itself<br/>admins · joins · anyone who writes"]
+        A["Bot joins the chat"] --> B["«Участвую» · N<br/>plus admins, joins, anyone who writes"]
     end
 
     subgraph WEB["🖥️ Web"]
@@ -102,14 +102,22 @@ This is the part that decides whether such a product is even possible.
 
 | Limit | Reality | What we do |
 |---|---|---|
-| **A bot cannot list group members** | The method was removed from the Bot API for privacy — only `getChatAdministrators`, `getChatMemberCount` and per-user lookups remain | The roster is **assembled passively**: the full admin list, every `chat_member` join/leave, and the author of any message sent while the bot is in the chat. Nobody presses anything |
+| **A bot cannot list group members** | The method was removed from the Bot API for privacy — only `getChatAdministrators`, `getChatMemberCount` and per-user lookups remain | Four sources, none of which needs the list: a **join button** carrying its own tally, the admin list, `chat_member` joins and leaves, and the author of any message. A sync button re-checks every id the system knows, and `tools/import_members.py` imports the real list once through a user account |
 | **A bot cannot message someone first** | Telegram requires the user to open the dialog | The group post carries a **personal deep link** (`t.me/bot?start=<token>`). Pressing *Start* opens the dialog *and* begins that person's review in one motion |
 
-> **Give the bot admin rights in the group** (or turn Group Privacy off in
-> BotFather). With privacy mode on — the default — Telegram only forwards
-> commands and replies to the bot, so it cannot notice everyone else writing and
-> the roster fills up far more slowly. Admins are always visible either way, and
-> `/members` in the chat re-syncs on demand.
+> **Give the bot admin rights in the group.** The invite link asks for them up
+> front (`?startgroup=true&admin=…`), so it is one tap. With privacy mode on —
+> the default for a non-admin bot — Telegram only forwards commands and replies,
+> so the bot cannot notice anyone else writing.
+>
+> **Filling the roster**, in order of effort: post `/enroll` and let people tap
+> **Участвую** (the button shows a running count); press **обновить** on the chat
+> page, which asks Telegram about every id the system already knows — people seen
+> in one chat are found in the others; or run
+> [`tools/import_members.py`](tools/import_members.py) once, which reads the full
+> member list over MTProto under a user account. The last one stays a manual tool
+> on purpose: a stored user session lets its holder act as that person in
+> Telegram, which is far more power than this product should hold.
 
 The same mechanism powers **login**. The site has no Telegram Login Widget — it needs a BotFather-registered domain and never works on localhost. Instead the site mints a **one-time token**, opens the bot with it, and polls until the bot confirms. Tokens are single-use and expire in ten minutes; the session then lives in an httpOnly cookie.
 
@@ -328,6 +336,8 @@ Public surface, all under `/api`, all behind the session cookie:
 | `GET` / `POST` | `/auth/me`, `/auth/logout` | Session |
 | `GET` | `/chats` | Chats you belong to |
 | `GET` | `/chats/{id}/members` | Everyone the bot has seen in the chat |
+| `POST` | `/chats/{id}/sync` | Re-check membership for every id we know |
+| `GET` | `/chats/{id}/telegram` | Member count and whether the bot is an admin |
 | `GET` `POST` | `/chats/{id}/teams` | List / create teams |
 | `GET` `PUT` | `/chats/{id}/questionnaire` | Read / replace the chat questionnaire |
 | `POST` | `/chats/{id}/questionnaire/apply` | Push it onto every team |
