@@ -85,7 +85,7 @@ export default function Chats() {
         <div>
           <h2 className="text-[19px] m-0 tracking-tight">Ваши чаты</h2>
           <p className="text-[13px] text-[var(--color-muted)] mt-1 mb-0">
-            Группы, где работает бот и вы отметились как участник
+            Группы, куда добавлен бот и где он видит вас среди участников
           </p>
         </div>
         {chats.length > 0 && <Pill tone="accent">{chats.length}</Pill>}
@@ -106,9 +106,9 @@ export default function Chats() {
           <div className="grid gap-3 text-left max-w-[720px] mx-auto"
                style={{ gridTemplateColumns: 'repeat(auto-fit,minmax(210px,1fr))' }}>
             {[
-              ['Добавьте бота', 'В рабочую группу, где сидит команда'],
-              ['Отправьте /enroll', 'Участники жмут «Участвую»'],
-              ['Соберите команду', 'Выберите лидера и состав, запустите'],
+              ['Добавьте бота', 'В рабочую группу, где сидит команда — лучше сразу админом'],
+              ['Участники подтянутся', 'Сами: админы сразу, остальные как напишут в чат'],
+              ['Соберите команду', 'Выберите лидера и состав, запустите оценку'],
             ].map(([title, text], i) => (
               <div key={title} className="p-4 rounded-xl bg-[var(--color-surface-2)]
                                           border border-[var(--color-border)] fade-up"
