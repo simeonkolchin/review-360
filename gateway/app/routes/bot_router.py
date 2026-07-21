@@ -18,6 +18,16 @@ async def enroll(payload: EnrollRequest):
     return result
 
 
+@router.post("/leave", summary="Someone left the group")
+async def leave(payload: dict):
+    return await data_client.post("/leave", json=payload)
+
+
+@router.post("/reachable", summary="This user has opened the bot, so we may DM them")
+async def reachable(payload: dict):
+    return await data_client.post("/reachable", json=payload)
+
+
 @router.get("/tasks", summary="What this user still has to evaluate")
 async def tasks(token: str, telegram_id: int):
     return await data_client.get(

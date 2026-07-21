@@ -1,63 +1,114 @@
-"""Group-chat handlers: enrolment.
+"""Group-chat handlers: keeping the member list in sync.
 
-Telegram's Bot API cannot list the members of a group, so people opt in by
-tapping a button. That also gives the bot permission to DM them later, which it
-otherwise would not have.
+The Bot API deliberately has no "list the members of this group" call, so the
+roster is assembled from everything Telegram *does* tell us:
+
+* the admin list, which `getChatAdministrators` returns in full;
+* `chat_member` updates — anyone joining or leaving while the bot is present;
+* the author of any message sent in the chat.
+
+Nobody has to press anything. The one thing self-enrolment used to buy — the
+right to DM someone — comes from the personal deep link in the round
+announcement instead: pressing Start opens the dialogue and begins the review.
 """
 
 import logging
 
-from aiogram import F, Router
+from aiogram import Bot, F, Router
 from aiogram.filters import Command
-from aiogram.types import CallbackQuery, Message
+from aiogram.types import ChatMemberUpdated, Message
 
-from app.keyboards.inline import enroll_keyboard
 from app.services import gateway
 from app.services.photos import get_avatar_url
 
 router = Router()
 logger = logging.getLogger(__name__)
 
-
-@router.message(Command("enroll"), F.chat.type.in_({"group", "supergroup"}))
-async def start_enrollment(message: Message) -> None:
-    await gateway.enroll(message.chat.id, message.chat.title or "Группа", message.from_user,
-                         is_admin=True)
-    await message.answer(
-        "🎯 <b>Оценка 360</b>\n\n"
-        "Нажмите «Участвую», чтобы попасть в список участников — "
-        "после этого вас можно будет добавить в команду на сайте.\n\n"
-        "<i>Это же даёт боту право написать вам в личку, когда начнётся опрос.</i>",
-        reply_markup=enroll_keyboard(),
-    )
+GROUPS = {"group", "supergroup"}
 
 
-@router.callback_query(F.data == "enroll")
-async def enroll_callback(query: CallbackQuery) -> None:
-    avatar = await get_avatar_url(query.bot, query.from_user.id)
-    result = await gateway.enroll(
-        query.message.chat.id,
-        query.message.chat.title or "Группа",
-        query.from_user,
+async def _remember(bot: Bot, chat, user, *, is_admin: bool = False, with_photo: bool = False):
+    """Record one person as a member of one chat."""
+    if user is None or user.is_bot:
+        return None
+    avatar = await get_avatar_url(bot, user.id) if with_photo else None
+    return await gateway.enroll(
+        chat.id,
+        chat.title or "Группа",
+        user,
         photo_url=avatar,
+        is_admin=is_admin,
     )
-    if result:
-        await query.answer("Вы в списке участников ✅", show_alert=False)
-    else:
-        await query.answer("Не удалось записать, попробуйте позже", show_alert=True)
+
+
+async def _sync_admins(bot: Bot, chat) -> int:
+    """Pull the full admin list — the only roster Telegram hands over."""
+    try:
+        admins = await bot.get_chat_administrators(chat.id)
+    except Exception as exc:
+        logger.warning("cannot read admins of %s: %s", chat.id, exc)
+        return 0
+    count = 0
+    for member in admins:
+        if await _remember(bot, chat, member.user, is_admin=True, with_photo=True):
+            count += 1
+    return count
 
 
 @router.message(F.new_chat_members)
-async def bot_added(message: Message) -> None:
-    """Greet the group as soon as the bot is added."""
+async def members_added(message: Message) -> None:
+    """The bot was added — or someone else was."""
     me = await message.bot.get_me()
-    if not any(u.id == me.id for u in message.new_chat_members):
+    added_bot = any(u.id == me.id for u in message.new_chat_members)
+
+    if added_bot:
+        await _remember(message.bot, message.chat, message.from_user, is_admin=True)
+        known = await _sync_admins(message.bot, message.chat)
+        await message.answer(
+            "👋 Привет! Я собираю обратную связь по методу <b>«Оценка 360»</b>.\n\n"
+            f"Участники подтягиваются автоматически — уже вижу <b>{known}</b>. "
+            "Остальные появятся, как только напишут что-нибудь в чате.\n\n"
+            "Дальше — соберите команду на сайте и запустите оценку: "
+            "я отмечу всех здесь и пришлю каждому опрос в личку."
+        )
         return
-    await gateway.enroll(message.chat.id, message.chat.title or "Группа", message.from_user,
-                         is_admin=True)
+
+    for user in message.new_chat_members:
+        await _remember(message.bot, message.chat, user, with_photo=True)
+
+
+@router.chat_member()
+async def membership_changed(update: ChatMemberUpdated) -> None:
+    """Someone joined or left while we were watching."""
+    if update.chat.type not in GROUPS:
+        return
+    status = update.new_chat_member.status
+    user = update.new_chat_member.user
+    if status in {"member", "administrator", "creator"}:
+        await _remember(
+            update.bot, update.chat, user,
+            is_admin=status in {"administrator", "creator"}, with_photo=True,
+        )
+    elif status in {"left", "kicked"}:
+        await gateway.forget(update.chat.id, user.id)
+
+
+@router.message(Command("members"), F.chat.type.in_(GROUPS))
+async def resync(message: Message) -> None:
+    """Manual nudge: re-read the admin list and record whoever asked."""
+    await _remember(message.bot, message.chat, message.from_user, with_photo=True)
+    known = await _sync_admins(message.bot, message.chat)
     await message.answer(
-        "👋 Привет! Я собираю обратную связь по методу <b>«Оценка 360»</b>.\n\n"
-        "Нажмите «Участвую» — и вы попадёте в список, из которого на сайте "
-        "собираются команды.",
-        reply_markup=enroll_keyboard(),
+        f"🔄 Список обновлён — вижу {known} администратор(ов) и всех, кто писал в чате.\n\n"
+        "<i>Telegram не отдаёт ботам полный список участников группы, поэтому "
+        "остальные добавятся, как только напишут сюда хоть что-то.</i>"
     )
+
+
+@router.message(F.chat.type.in_(GROUPS))
+async def any_group_message(message: Message) -> None:
+    """Last resort, and in practice the most effective one: passive harvesting.
+
+    Runs after every other group handler, so it never swallows a command.
+    """
+    await _remember(message.bot, message.chat, message.from_user)

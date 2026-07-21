@@ -2,19 +2,25 @@ import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
-  UserPlus, Users, X, Sparkles,
+  UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
 } from 'lucide-react'
 import { api, type Member, type Team } from '../api/client'
+import { useLive } from '../api/live'
 import { Avatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
+import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
 
 export default function ChatDetail() {
   const { chatId } = useParams()
   const navigate = useNavigate()
 
-  const [members, setMembers] = useState<Member[]>([])
-  const [teams, setTeams] = useState<Team[]>([])
-  const [loading, setLoading] = useState(true)
+  // Members and teams stream in on their own — someone writing in the group or
+  // finishing their review shows up here without anyone pressing reload.
+  const live = useLive<Member[]>(chatId ? `/chats/${chatId}/members` : null, 5000)
+  const teamsLive = useLive<Team[]>(chatId ? `/chats/${chatId}/teams` : null, 5000)
+  const members = live.data ?? []
+  const teams = teamsLive.data ?? []
+  const loading = live.loading
 
   // team builder
   const [name, setName] = useState('')
@@ -25,19 +31,13 @@ export default function ChatDetail() {
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
 
-  // modals
+  // modals & panels
   const [confirmDelete, setConfirmDelete] = useState<Team | null>(null)
   const [confirmStart, setConfirmStart] = useState<Team | null>(null)
+  const [chatQuestions, setChatQuestions] = useState(false)
+  const [teamQuestions, setTeamQuestions] = useState<Team | null>(null)
 
-  const loadTeams = () => api.get<Team[]>(`/chats/${chatId}/teams`).then(setTeams)
-
-  useEffect(() => {
-    setLoading(true)
-    Promise.all([
-      api.get<Member[]>(`/chats/${chatId}/members`).then(setMembers),
-      loadTeams(),
-    ]).finally(() => setLoading(false))
-  }, [chatId])
+  const loadTeams = teamsLive.refresh
 
   const add = (id: number) => setPicked(p => (p.includes(id) ? p : [...p, id]))
   const drop = (id: number) => {
@@ -79,9 +79,15 @@ export default function ChatDetail() {
 
   return (
     <div>
-      <Link to="/" className="btn btn-ghost px-3 py-2 mb-5 no-underline inline-flex">
-        <ArrowLeft className="w-4 h-4" /> Обзор
-      </Link>
+      <div className="flex items-center gap-2 mb-5">
+        <Link to="/" className="btn btn-ghost px-3 py-2 no-underline inline-flex">
+          <ArrowLeft className="w-4 h-4" /> Обзор
+        </Link>
+        <div className="flex-1" />
+        <button className="btn btn-ghost px-3 py-2" onClick={() => setChatQuestions(true)}>
+          <SlidersHorizontal className="w-4 h-4" /> Опросник чата
+        </button>
+      </div>
 
       {/* ---------------- team builder ---------------- */}
       <div className="grid gap-4 mb-10 md:grid-cols-[1fr_1.15fr]">
@@ -94,7 +100,8 @@ export default function ChatDetail() {
             <Pill>{available.length}</Pill>
           </div>
           <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-4">
-            Перетащите людей в команду справа — или просто нажмите на карточку
+            Подтягиваются из чата автоматически. Перетащите в команду справа — или
+            просто нажмите на карточку
           </p>
 
           <div className="flex flex-col gap-2 max-h-[420px] overflow-auto pr-1">
@@ -102,7 +109,7 @@ export default function ChatDetail() {
 
             {!loading && members.length === 0 && (
               <p className="text-[13px] text-[var(--color-muted)] py-6 text-center m-0">
-                Никто ещё не нажал «Участвую» в группе
+                Пока пусто. Добавьте бота в группу — участники подтянутся сами
               </p>
             )}
 
@@ -276,6 +283,10 @@ export default function ChatDetail() {
                     <Play className="w-4 h-4" /> Запустить
                   </button>
                 )}
+                <button className="btn btn-ghost px-3 py-2" title="Опросник этой команды"
+                        onClick={() => setTeamQuestions(team)}>
+                  <ListChecks className="w-4 h-4" />
+                </button>
                 <button className="btn btn-ghost px-3 py-2" title="Удалить команду"
                         onClick={() => setConfirmDelete(team)}>
                   <Trash2 className="w-4 h-4" />
@@ -335,6 +346,24 @@ export default function ChatDetail() {
             </button>
           </>
         }
+      />
+
+      <QuestionnaireDrawer
+        open={chatQuestions}
+        onClose={() => setChatQuestions(false)}
+        scope="chat"
+        id={chatId!}
+        title="Опросник чата"
+        onSaved={loadTeams}
+      />
+
+      <QuestionnaireDrawer
+        open={!!teamQuestions}
+        onClose={() => setTeamQuestions(null)}
+        scope="team"
+        id={teamQuestions?.id ?? 0}
+        title={`Опросник — «${teamQuestions?.name ?? ''}»`}
+        onSaved={loadTeams}
       />
     </div>
   )

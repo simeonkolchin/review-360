@@ -28,6 +28,8 @@ from app.models import (
 from app.schemas.requests import (
     EnrollRequest,
     EventRequest,
+    QuestionItem,
+    QuestionnaireRequest,
     TeamCreateRequest,
     SubmitResponsesRequest,
 )
@@ -37,6 +39,8 @@ from app.schemas.responses import (
     ChatResponse,
     CompetencyResponse,
     MemberResponse,
+    ParticipantProgress,
+    QuestionnaireResponse,
     RoundProgressResponse,
     TeamResponse,
     TeamResultsResponse,
@@ -63,6 +67,61 @@ async def _reload(session: AsyncSession, model, pk: int):
 async def require_service_token(x_service_token: str = Header(default="")) -> None:
     if not secrets.compare_digest(x_service_token, SERVICE_TOKEN):
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Invalid service token")
+
+
+# ------------------------------------------------------------------- questionnaire
+
+
+async def _competencies_at(
+    session: AsyncSession, *, chat_id: int | None = None, team_id: int | None = None
+) -> list[Competency]:
+    """Active questions at exactly one scope, ordered."""
+    query = select(Competency).where(Competency.is_active.is_(True))
+    if team_id is not None:
+        query = query.where(Competency.team_id == team_id)
+    elif chat_id is not None:
+        query = query.where(Competency.chat_id == chat_id, Competency.team_id.is_(None))
+    else:
+        query = query.where(Competency.chat_id.is_(None), Competency.team_id.is_(None))
+    return list(await session.scalars(query.order_by(Competency.position, Competency.id)))
+
+
+async def resolve_competencies(
+    session: AsyncSession, *, team: Team | None = None, chat_id: int | None = None
+) -> list[Competency]:
+    """The questionnaire that actually applies, most specific scope first.
+
+    team's own → its chat's → the built-in defaults. A team inherits silently
+    until someone edits it, which is what makes "override just this team" cheap.
+    """
+    if team is not None:
+        own = await _competencies_at(session, team_id=team.id)
+        if own:
+            return own
+        chat_id = team.chat_id
+    if chat_id is not None:
+        shared = await _competencies_at(session, chat_id=chat_id)
+        if shared:
+            return shared
+    return await _competencies_at(session)
+
+
+async def _competencies_for_round(session: AsyncSession, round_: ReviewRound) -> list[Competency]:
+    """Questions as they were when the round started."""
+    if round_.competency_ids:
+        rows = list(
+            await session.scalars(
+                select(Competency).where(Competency.id.in_(round_.competency_ids))
+            )
+        )
+        order = {cid: i for i, cid in enumerate(round_.competency_ids)}
+        return sorted(rows, key=lambda c: order.get(c.id, 0))
+    # Rounds created before snapshots existed fall back to live resolution.
+    return await resolve_competencies(session, team=round_.team)
+
+
+def _competency_payload(items: list[Competency]) -> list[CompetencyResponse]:
+    return [CompetencyResponse(id=c.id, name=c.name, description=c.description) for c in items]
 
 
 # --------------------------------------------------------------------------- users
@@ -126,6 +185,46 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
 
     await session.commit()
     return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
+
+
+@router.post("/leave", dependencies=[Depends(require_service_token)])
+async def leave_chat(payload: dict, session: AsyncSession = Depends(get_session)):
+    """Drop a membership when Telegram tells us the person left the group."""
+    user = await session.scalar(select(TgUser).where(TgUser.telegram_id == payload["telegram_id"]))
+    chat = await session.scalar(
+        select(Chat).where(Chat.telegram_chat_id == payload["telegram_chat_id"])
+    )
+    if user is None or chat is None:
+        return {"removed": False}
+    membership = await session.scalar(
+        select(Membership).where(
+            Membership.chat_id == chat.id, Membership.tg_user_id == user.id
+        )
+    )
+    if membership is None:
+        return {"removed": False}
+    await session.delete(membership)
+    await session.commit()
+    return {"removed": True}
+
+
+@router.post("/reachable", dependencies=[Depends(require_service_token)])
+async def mark_reachable(payload: dict, session: AsyncSession = Depends(get_session)):
+    """The user opened a private chat with the bot — every membership becomes DM-able."""
+    user = await session.scalar(select(TgUser).where(TgUser.telegram_id == payload["telegram_id"]))
+    if user is None:
+        user = TgUser(telegram_id=payload["telegram_id"])
+        session.add(user)
+        await session.flush()
+    for field in ("username", "first_name", "last_name"):
+        if payload.get(field):
+            setattr(user, field, payload[field])
+
+    rows = list(await session.scalars(select(Membership).where(Membership.tg_user_id == user.id)))
+    for membership in rows:
+        membership.can_dm = True
+    await session.commit()
+    return {"chats": len(rows)}
 
 
 @router.get("/chats", response_model=list[ChatResponse], dependencies=[Depends(require_service_token)])
@@ -253,15 +352,203 @@ async def delete_team(team_id: int, session: AsyncSession = Depends(get_session)
     return {"message": "deleted"}
 
 
+# ------------------------------------------------------------------ questionnaires
+
+
+def _questionnaire(items: list[Competency], source: str) -> QuestionnaireResponse:
+    return QuestionnaireResponse(source=source, competencies=_competency_payload(items))
+
+
+@router.get(
+    "/chats/{chat_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def get_chat_questionnaire(chat_id: int, session: AsyncSession = Depends(get_session)):
+    own = await _competencies_at(session, chat_id=chat_id)
+    if own:
+        return _questionnaire(own, "chat")
+    return _questionnaire(await _competencies_at(session), "default")
+
+
+@router.get(
+    "/teams/{team_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def get_team_questionnaire(team_id: int, session: AsyncSession = Depends(get_session)):
+    team = await session.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Team not found")
+    own = await _competencies_at(session, team_id=team.id)
+    if own:
+        return _questionnaire(own, "team")
+    shared = await _competencies_at(session, chat_id=team.chat_id)
+    if shared:
+        return _questionnaire(shared, "chat")
+    return _questionnaire(await _competencies_at(session), "default")
+
+
+async def _save_questionnaire(
+    session: AsyncSession,
+    items: list[QuestionItem],
+    *,
+    chat_id: int | None = None,
+    team_id: int | None = None,
+) -> list[Competency]:
+    """Replace the questionnaire at one scope with exactly `items`.
+
+    Questions that already carry answers are deactivated instead of deleted, so
+    finished rounds keep resolving their own snapshot.
+    """
+    if not items:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "A questionnaire needs at least one question")
+
+    existing = {
+        c.id: c
+        for c in await _competencies_at(session, chat_id=chat_id, team_id=team_id)
+    }
+    kept: list[Competency] = []
+
+    for position, item in enumerate(items):
+        name = item.name.strip()
+        if not name:
+            raise HTTPException(status.HTTP_400_BAD_REQUEST, "A question needs a name")
+        row = existing.pop(item.id, None) if item.id else None
+        if row is None:
+            row = Competency(chat_id=chat_id, team_id=team_id)
+            session.add(row)
+        row.name = name[:128]
+        row.description = (item.description or "").strip()[:500] or None
+        row.position = position
+        row.is_active = True
+        kept.append(row)
+
+    for orphan in existing.values():
+        used = await session.scalar(
+            select(func.count(Response.id)).where(Response.competency_id == orphan.id)
+        )
+        if used:
+            orphan.is_active = False
+        else:
+            await session.delete(orphan)
+
+    await session.commit()
+    return await _competencies_at(session, chat_id=chat_id, team_id=team_id)
+
+
+@router.put(
+    "/chats/{chat_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def save_chat_questionnaire(
+    chat_id: int, payload: QuestionnaireRequest, session: AsyncSession = Depends(get_session)
+):
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat not found")
+    saved = await _save_questionnaire(session, payload.competencies, chat_id=chat.id)
+    return _questionnaire(saved, "chat")
+
+
+@router.put(
+    "/teams/{team_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def save_team_questionnaire(
+    team_id: int, payload: QuestionnaireRequest, session: AsyncSession = Depends(get_session)
+):
+    team = await session.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Team not found")
+    saved = await _save_questionnaire(session, payload.competencies, team_id=team.id)
+    return _questionnaire(saved, "team")
+
+
+@router.delete(
+    "/teams/{team_id}/questionnaire",
+    response_model=QuestionnaireResponse,
+    dependencies=[Depends(require_service_token)],
+)
+async def reset_team_questionnaire(team_id: int, session: AsyncSession = Depends(get_session)):
+    """Drop the team's own questions so it inherits the chat's again."""
+    team = await session.get(Team, team_id)
+    if team is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Team not found")
+    for row in await _competencies_at(session, team_id=team.id):
+        used = await session.scalar(
+            select(func.count(Response.id)).where(Response.competency_id == row.id)
+        )
+        if used:
+            row.is_active = False
+        else:
+            await session.delete(row)
+    await session.commit()
+    return await get_team_questionnaire(team_id, session)
+
+
+@router.post(
+    "/chats/{chat_id}/questionnaire/apply",
+    dependencies=[Depends(require_service_token)],
+)
+async def apply_chat_questionnaire(chat_id: int, session: AsyncSession = Depends(get_session)):
+    """Push the chat questionnaire onto every team, discarding their overrides."""
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat not found")
+    reset = 0
+    for team in chat.teams:
+        own = await _competencies_at(session, team_id=team.id)
+        if not own:
+            continue
+        for row in own:
+            used = await session.scalar(
+                select(func.count(Response.id)).where(Response.competency_id == row.id)
+            )
+            if used:
+                row.is_active = False
+            else:
+                await session.delete(row)
+        reset += 1
+    await session.commit()
+    return {"teams_reset": reset, "teams_total": len(chat.teams)}
+
+
 # --------------------------------------------------------------------------- rounds
 
 
-def _progress(round_: ReviewRound) -> RoundProgressResponse:
+def _progress(
+    round_: ReviewRound,
+    can_dm: dict[int, bool] | None = None,
+    competencies: list[Competency] | None = None,
+) -> RoundProgressResponse:
     total = len(round_.assignments)
     done = sum(1 for a in round_.assignments if a.completed)
     by_reviewer: dict[int, list[Assignment]] = {}
     for a in round_.assignments:
         by_reviewer.setdefault(a.reviewer_id, []).append(a)
+
+    can_dm = can_dm or {}
+    participants: list[ParticipantProgress] = []
+    for tasks in by_reviewer.values():
+        reviewer = tasks[0].reviewer
+        finished = sum(1 for t in tasks if t.completed)
+        # "Started" means at least one answer landed, not merely that the bot
+        # was opened — that is the distinction a leader actually chases people on.
+        touched = finished > 0 or any(t.responses for t in tasks)
+        participants.append(
+            ParticipantProgress(
+                user=user_to_schema(reviewer),
+                state="done" if finished == len(tasks) else ("in_progress" if touched else "not_started"),
+                completed=finished,
+                total=len(tasks),
+                can_dm=can_dm.get(reviewer.id, False),
+            )
+        )
+    participants.sort(key=lambda p: (p.state != "done", p.user.display_name))
+
     return RoundProgressResponse(
         id=round_.id,
         team_id=round_.team_id,
@@ -272,6 +559,19 @@ def _progress(round_: ReviewRound) -> RoundProgressResponse:
         completed_assignments=done,
         participants_done=sum(1 for t in by_reviewer.values() if all(x.completed for x in t)),
         participants_total=len(by_reviewer),
+        participants=participants,
+        competencies=_competency_payload(competencies or []),
+    )
+
+
+async def _progress_full(session: AsyncSession, round_: ReviewRound) -> RoundProgressResponse:
+    """Progress plus everything the live dashboard needs in one round-trip."""
+    chat_id = round_.team.chat_id
+    rows = list(await session.scalars(select(Membership).where(Membership.chat_id == chat_id)))
+    return _progress(
+        round_,
+        can_dm={m.tg_user_id: m.can_dm for m in rows},
+        competencies=await _competencies_for_round(session, round_),
     )
 
 
@@ -292,7 +592,16 @@ async def start_round(team_id: int, session: AsyncSession = Depends(get_session)
     if len(member_ids) < 2:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "A team needs at least 2 members")
 
-    round_ = ReviewRound(team_id=team.id, status=RoundStatus.active, token=secrets.token_urlsafe(16))
+    competencies = await resolve_competencies(session, team=team)
+    if not competencies:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "The questionnaire is empty")
+
+    round_ = ReviewRound(
+        team_id=team.id,
+        status=RoundStatus.active,
+        token=secrets.token_urlsafe(16),
+        competency_ids=[c.id for c in competencies],
+    )
     session.add(round_)
     await session.flush()
     for reviewer_id, reviewee_id, kind in build_assignments_for_team(member_ids, team.leader_id):
@@ -300,7 +609,7 @@ async def start_round(team_id: int, session: AsyncSession = Depends(get_session)
             Assignment(round_id=round_.id, reviewer_id=reviewer_id, reviewee_id=reviewee_id, kind=kind)
         )
     await session.commit()
-    return _progress(await _reload(session, ReviewRound, round_.id))
+    return await _progress_full(session, await _reload(session, ReviewRound, round_.id))
 
 
 @router.get(
@@ -312,7 +621,7 @@ async def get_round(round_id: int, session: AsyncSession = Depends(get_session))
     round_ = await session.get(ReviewRound, round_id)
     if round_ is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Round not found")
-    return _progress(round_)
+    return await _progress_full(session, round_)
 
 
 @router.post(
@@ -327,7 +636,7 @@ async def close_round(round_id: int, session: AsyncSession = Depends(get_session
     round_.status = RoundStatus.closed
     round_.closed_at = datetime.now(UTC)
     await session.commit()
-    return _progress(await _reload(session, ReviewRound, round_id))
+    return await _progress_full(session, await _reload(session, ReviewRound, round_id))
 
 
 @router.get(
@@ -339,15 +648,13 @@ async def round_results(round_id: int, session: AsyncSession = Depends(get_sessi
     round_ = await session.get(ReviewRound, round_id)
     if round_ is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Round not found")
-    competencies = list(await session.scalars(select(Competency).order_by(Competency.position)))
+    competencies = await _competencies_for_round(session, round_)
     assignments = list(round_.assignments)
     return TeamResultsResponse(
         round_id=round_.id,
         team_name=round_.team.name,
         status=round_.status.value,
-        competencies=[
-            CompetencyResponse(id=c.id, name=c.name, description=c.description) for c in competencies
-        ],
+        competencies=_competency_payload(competencies),
         members=[
             build_user_result(m.tg_user, round_.id, assignments, competencies)
             for m in round_.team.members
@@ -377,13 +684,11 @@ async def bot_tasks(token: str, telegram_id: int, session: AsyncSession = Depend
     if not mine:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "You are not part of this round")
 
-    competencies = list(await session.scalars(select(Competency).order_by(Competency.position)))
+    competencies = await _competencies_for_round(session, round_)
     return BotTaskResponse(
         round_id=round_.id,
         team_name=round_.team.name,
-        competencies=[
-            CompetencyResponse(id=c.id, name=c.name, description=c.description) for c in competencies
-        ],
+        competencies=_competency_payload(competencies),
         assignments=[
             AssignmentResponse(
                 id=a.id,
@@ -441,11 +746,14 @@ async def submit_responses(
             )
 
     await session.flush()
-    total_competencies = await session.scalar(select(func.count(Competency.id)))
+    expected = await _competencies_for_round(session, assignment.round)
     answered = await session.scalar(
-        select(func.count(Response.id)).where(Response.assignment_id == assignment.id)
+        select(func.count(Response.id)).where(
+            Response.assignment_id == assignment.id,
+            Response.competency_id.in_([c.id for c in expected]),
+        )
     )
-    assignment.completed = answered >= total_competencies
+    assignment.completed = answered >= len(expected)
     await session.commit()
 
     return {"assignment_id": assignment.id, "completed": assignment.completed}
@@ -459,12 +767,12 @@ async def bot_results(telegram_id: int, session: AsyncSession = Depends(get_sess
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
 
     member_rows = list(await session.scalars(select(TeamMember).where(TeamMember.tg_user_id == user.id)))
-    competencies = list(await session.scalars(select(Competency).order_by(Competency.position)))
 
     for tm in sorted(member_rows, key=lambda r: r.id, reverse=True):
         team = await session.get(Team, tm.team_id)
         for round_ in sorted(team.rounds, key=lambda r: r.id, reverse=True):
             if round_.status == RoundStatus.closed:
+                competencies = await _competencies_for_round(session, round_)
                 result = build_user_result(user, round_.id, list(round_.assignments), competencies)
                 return {
                     "found": True,

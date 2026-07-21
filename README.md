@@ -52,10 +52,10 @@ The instrument is fine. The delivery kills it.
 
 Run the whole thing **where the team already talks**. No accounts, no invitation emails, no forms — a Telegram group, a button, and about five minutes per person.
 
-1. The bot joins the work chat; people **enrol themselves** with one tap.
+1. The bot joins the work chat and **picks the roster up by itself** — admins, joins, and anyone who writes.
 2. Teams are assembled on the web by **dragging** members into a team and putting a crown on the leader.
 3. One press of *Start* and the bot tags everyone in the group, handing each person a **personal deep link**.
-4. Each participant answers **in their own DM** — with the reviewee's Telegram photo in front of them, so they always know who they are rating.
+4. Each participant answers **in their own DM**, inside a single message that keeps being edited — the reviewee's photo above the question, no wall of messages.
 5. Results appear on the dashboard and inside the bot, with anonymity enforced by the backend rather than by good intentions.
 
 And the number that matters is never the average. It is the **gap between self-assessment and how the team sees you** — every chart here is built around that axis.
@@ -65,7 +65,7 @@ And the number that matters is never the average. It is the **gap between self-a
 ```mermaid
 flowchart LR
     subgraph TG["💬 Telegram group"]
-        A["Bot joins the chat"] --> B["/enroll → «Участвую»<br/>people opt in themselves"]
+        A["Bot joins the chat"] --> B["Roster assembles itself<br/>admins · joins · anyone who writes"]
     end
 
     subgraph WEB["🖥️ Web"]
@@ -74,7 +74,7 @@ flowchart LR
     end
 
     subgraph DM["📩 Telegram DM"]
-        F["Photo of the person<br/>being rated"] --> G["1–5 per competency"]
+        F["One card, edited in place<br/>photo of the person being rated"] --> G["1–5 per competency"]
         G --> H["Anonymous free-text note"]
     end
 
@@ -102,7 +102,7 @@ This is the part that decides whether such a product is even possible.
 
 | Limit | Reality | What we do |
 |---|---|---|
-| **A bot cannot list group members** | The method was removed from the Bot API for privacy — only `getChatAdministrators`, `getChatMemberCount` and per-user lookups remain | People **enrol themselves** with one button. It is not a workaround so much as the honest version: being reviewed requires consent |
+| **A bot cannot list group members** | The method was removed from the Bot API for privacy — only `getChatAdministrators`, `getChatMemberCount` and per-user lookups remain | The roster is **assembled passively**: the full admin list, every `chat_member` join/leave, and the author of any message sent while the bot is in the chat. Nobody presses anything |
 | **A bot cannot message someone first** | Telegram requires the user to open the dialog | The group post carries a **personal deep link** (`t.me/bot?start=<token>`). Pressing *Start* opens the dialog *and* begins that person's review in one motion |
 
 The same mechanism powers **login**. The site has no Telegram Login Widget — it needs a BotFather-registered domain and never works on localhost. Instead the site mints a **one-time token**, opens the bot with it, and polls until the bot confirms. Tokens are single-use and expire in ten minutes; the session then lives in an httpOnly cookie.
@@ -172,9 +172,42 @@ The method collapses the moment people suspect they can be identified — so thi
 - Free-text notes come back as a **shuffled list of strings with no author**, held back by the same threshold.
 - **Self and leader assessments are labelled**, precisely because they are attributable by construction: everyone knows there is exactly one of each, so pretending otherwise would be the dishonest choice.
 
+## 📝 Questionnaires
+
+Questions are not hard-coded. They resolve at three scopes, most specific first:
+
+```mermaid
+flowchart LR
+    T["👥 Team questionnaire<br/><sub>edited for this team only</sub>"] -->|"if set"| USE(["Questions used<br/>by the round"])
+    C["💬 Chat questionnaire<br/><sub>every team inherits it</sub>"] -->|"otherwise"| USE
+    D["📦 Built-in defaults<br/><sub>five competencies, seeded</sub>"] -->|"otherwise"| USE
+    USE --> SNAP["📸 Snapshot into the round<br/><sub>later edits never rewrite finished results</sub>"]
+
+    classDef t fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef c fill:#1d2333,stroke:#6366f1,color:#e8eef6
+    classDef d fill:#15171d,stroke:#31363f,color:#9aa3b2
+    classDef u fill:#16241f,stroke:#4ade80,color:#e8eef6
+    class T t
+    class C c
+    class D d
+    class USE,SNAP u
+```
+
+A side panel on the chat page edits the shared list — add, rename, reorder by
+dragging, delete, 1 to 20 questions. **«Обновить у всех команд»** drops every
+team's override so the whole chat is back on one questionnaire.
+
+Each team has the same panel. It opens showing what the team currently inherits;
+saving turns those into the team's own, leaving other teams untouched, and
+«Как в чате» hands it back.
+
+Two rules keep history honest: a round **snapshots** its questionnaire when it
+starts, so editing questions later cannot rewrite finished results; and a
+question that already carries answers is **deactivated rather than deleted**.
+
 ## 📊 Scoring
 
-Five competencies are seeded on first boot and can be edited in the database:
+The seeded defaults, used until someone edits them:
 
 | Competency | What it asks about |
 |---|---|
@@ -191,7 +224,8 @@ Each is rated 1–5. For every person the engine produces the self score, the pe
 - **Login** — a decoding headline (rAF text-scramble, stepped on a timer, `aria-label` for screen readers, instant for `prefers-reduced-motion`) and a three-step card that opens the bot.
 - **Overview** — connected chats as bento tiles, with an onboarding path for the first one.
 - **Team builder** — drag members from the participant list into the team zone, crown the leader, create. Everything is also clickable, so it works without a mouse drag.
-- **Round** — live progress, participants done, and a modal confirming exactly who is about to be pinged.
+- **Questionnaire panel** — slides in from the right, for the chat or for one team; drag to reorder, one button to push the chat's list onto every team.
+- **Round** — live participant board (не начал / в процессе / прошёл), progress bars that move on their own, and a modal confirming exactly who is about to be pinged.
 - **Results** — a radar per person, self-vs-team bars per competency, and the anonymous comments underneath.
 
 Dark UI, Geist, blue accent, motion on every transition — page enters, staggered cards, scrim modals, pressed-button feedback.
@@ -288,6 +322,9 @@ Public surface, all under `/api`, all behind the session cookie:
 | `GET` | `/chats` | Chats you belong to |
 | `GET` | `/chats/{id}/members` | People who enrolled themselves |
 | `GET` `POST` | `/chats/{id}/teams` | List / create teams |
+| `GET` `PUT` | `/chats/{id}/questionnaire` | Read / replace the chat questionnaire |
+| `POST` | `/chats/{id}/questionnaire/apply` | Push it onto every team |
+| `GET` `PUT` `DELETE` | `/teams/{id}/questionnaire` | Team override — read, set, drop |
 | `DELETE` | `/teams/{id}` | Delete a team |
 | `POST` | `/teams/{id}/rounds` | Start a round — posts into the group |
 | `GET` | `/rounds/{id}` | Live progress |
@@ -338,7 +375,6 @@ enrolment → auth is genuinely required → login through the bot bridge → te
 
 ## 🗺️ Roadmap
 
-- [ ] Custom competency sets per team, editable from the web
 - [ ] Round history and dynamics: how the gap moves quarter over quarter
 - [ ] PDF export of an individual report
 - [ ] Reminders for people who have not finished

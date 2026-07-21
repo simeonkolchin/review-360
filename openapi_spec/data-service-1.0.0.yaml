@@ -73,6 +73,77 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /leave:
+    post:
+      tags:
+      - Data
+      summary: Leave Chat
+      description: Drop a membership when Telegram tells us the person left the group.
+      operationId: leave_chat_leave_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /reachable:
+    post:
+      tags:
+      - Data
+      summary: Mark Reachable
+      description: The user opened a private chat with the bot — every membership
+        becomes DM-able.
+      operationId: mark_reachable_reachable_post
+      parameters:
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats:
     get:
       tags:
@@ -250,6 +321,214 @@ paths:
         schema:
           type: integer
           title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/questionnaire:
+    get:
+      tags:
+      - Data
+      summary: Get Chat Questionnaire
+      operationId: get_chat_questionnaire_chats__chat_id__questionnaire_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - Data
+      summary: Save Chat Questionnaire
+      operationId: save_chat_questionnaire_chats__chat_id__questionnaire_put
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}/questionnaire:
+    get:
+      tags:
+      - Data
+      summary: Get Team Questionnaire
+      operationId: get_team_questionnaire_teams__team_id__questionnaire_get
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - Data
+      summary: Save Team Questionnaire
+      operationId: save_team_questionnaire_teams__team_id__questionnaire_put
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - Data
+      summary: Reset Team Questionnaire
+      description: Drop the team's own questions so it inherits the chat's again.
+      operationId: reset_team_questionnaire_teams__team_id__questionnaire_delete
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: x-service-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Service-Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/QuestionnaireResponse'
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/questionnaire/apply:
+    post:
+      tags:
+      - Data
+      summary: Apply Chat Questionnaire
+      description: Push the chat questionnaire onto every team, discarding their overrides.
+      operationId: apply_chat_questionnaire_chats__chat_id__questionnaire_apply_post
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
       - name: x-service-token
         in: header
         required: false
@@ -929,6 +1208,88 @@ components:
       - telegram_id
       - display_name
       title: MemberResponse
+    ParticipantProgress:
+      properties:
+        user:
+          $ref: '#/components/schemas/UserResponse'
+        state:
+          type: string
+          title: State
+        completed:
+          type: integer
+          title: Completed
+        total:
+          type: integer
+          title: Total
+        can_dm:
+          type: boolean
+          title: Can Dm
+      type: object
+      required:
+      - user
+      - state
+      - completed
+      - total
+      - can_dm
+      title: ParticipantProgress
+      description: Where one reviewer is in the round — the live view a leader watches.
+    QuestionItem:
+      properties:
+        id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Id
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - name
+      title: QuestionItem
+      description: One question as the editor sends it back; `id` is absent for new
+        ones.
+    QuestionnaireRequest:
+      properties:
+        competencies:
+          items:
+            $ref: '#/components/schemas/QuestionItem'
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Competencies
+      type: object
+      required:
+      - competencies
+      title: QuestionnaireRequest
+    QuestionnaireResponse:
+      properties:
+        source:
+          type: string
+          title: Source
+        competencies:
+          items:
+            $ref: '#/components/schemas/CompetencyResponse'
+          type: array
+          title: Competencies
+      type: object
+      required:
+      - source
+      - competencies
+      title: QuestionnaireResponse
+      description: 'Which questionnaire applies, and where it came from.
+
+
+        `source` is what lets the UI say "inherited from the chat" instead of
+
+        pretending every team configured itself.'
     ResponseItem:
       properties:
         competency_id:
@@ -981,6 +1342,18 @@ components:
         participants_total:
           type: integer
           title: Participants Total
+        participants:
+          items:
+            $ref: '#/components/schemas/ParticipantProgress'
+          type: array
+          title: Participants
+          default: []
+        competencies:
+          items:
+            $ref: '#/components/schemas/CompetencyResponse'
+          type: array
+          title: Competencies
+          default: []
       type: object
       required:
       - id

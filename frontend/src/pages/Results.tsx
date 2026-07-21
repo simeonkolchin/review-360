@@ -1,31 +1,44 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { ArrowLeft, RefreshCw, Lock, CheckCircle2, MessageSquareQuote } from 'lucide-react'
+import {
+  ArrowLeft, RefreshCw, Lock, CheckCircle2, MessageSquareQuote,
+  Check, Hourglass, CircleDashed, BellOff, ListChecks,
+} from 'lucide-react'
 import {
   PolarAngleAxis, PolarGrid, PolarRadiusAxis, Radar, RadarChart, ResponsiveContainer, Legend, Tooltip,
 } from 'recharts'
-import { api, type Round, type TeamResults } from '../api/client'
+import { api, type Participant, type Round, type TeamResults } from '../api/client'
+import { useLive } from '../api/live'
 import { Avatar, Pill, ScoreBar } from '../components/ui'
+import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
 
 export default function Results() {
   const { roundId } = useParams()
   const navigate = useNavigate()
-  const [round, setRound] = useState<Round | null>(null)
-  const [results, setResults] = useState<TeamResults | null>(null)
+  const [questions, setQuestions] = useState(false)
 
-  const load = useCallback(async () => {
-    setRound(await api.get<Round>(`/rounds/${roundId}`))
-    setResults(await api.get<TeamResults>(`/rounds/${roundId}/results`))
-  }, [roundId])
+  // Both poll: answers land while the page is open, and the whole point of the
+  // status board is watching them land.
+  const roundLive = useLive<Round>(roundId ? `/rounds/${roundId}` : null, 4000)
+  const resultsLive = useLive<TeamResults>(roundId ? `/rounds/${roundId}/results` : null, 6000)
+  const round = roundLive.data
+  const results = resultsLive.data
 
-  useEffect(() => { load() }, [load])
+  const load = () => { roundLive.refresh(); resultsLive.refresh() }
 
   const close = async () => {
     await api.post(`/rounds/${roundId}/close`)
     load()
   }
 
-  if (!round || !results) return <p className="text-[var(--color-text-secondary)]">Загрузка…</p>
+  if (!round || !results) {
+    return (
+      <div className="grid gap-4">
+        <div className="h-[92px] rounded-2xl skeleton" />
+        <div className="h-[320px] rounded-2xl skeleton" />
+      </div>
+    )
+  }
 
   const pct = round.total_assignments
     ? Math.round((round.completed_assignments / round.total_assignments) * 100) : 0
@@ -36,7 +49,20 @@ export default function Results() {
         <ArrowLeft className="w-4 h-4" /> Назад
       </button>
 
-      <h2 className="text-[22px] m-0 mb-4 tracking-tight">Оценка · {round.team_name}</h2>
+      <div className="flex items-center gap-3 mb-4 flex-wrap">
+        <h2 className="text-[22px] m-0 tracking-tight">Оценка · {round.team_name}</h2>
+        {round.status === 'active' && (
+          <span className="flex items-center gap-2 text-[12px] text-[var(--color-muted)]">
+            <span className="pulse-dot inline-block w-1.5 h-1.5 rounded-full bg-[var(--color-success)]
+                             text-[var(--color-success)]" />
+            обновляется вживую
+          </span>
+        )}
+        <div className="flex-1" />
+        <button className="btn btn-ghost px-3 py-2" onClick={() => setQuestions(true)}>
+          <ListChecks className="w-4 h-4" /> Опросник команды
+        </button>
+      </div>
 
       <div className="card p-5 mb-5">
         <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -70,6 +96,27 @@ export default function Results() {
           </p>
         )}
       </div>
+
+      {round.participants.length > 0 && (
+        <div className="card p-5 mb-5">
+          <div className="flex items-center justify-between mb-1">
+            <h3 className="text-[15px] m-0">Кто прошёл опрос</h3>
+            <div className="flex gap-2">
+              {(['done', 'in_progress', 'not_started'] as const).map(state => {
+                const n = round.participants.filter(p => p.state === state).length
+                return n ? <Pill key={state} tone={STATE[state].tone}>{STATE[state].label}: {n}</Pill> : null
+              })}
+            </div>
+          </div>
+          <p className="text-[12.5px] text-[var(--color-muted)] mt-1.5 mb-4">
+            Статусы меняются сами — страницу обновлять не нужно
+          </p>
+
+          <div className="grid gap-2" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(260px,1fr))' }}>
+            {round.participants.map(p => <ParticipantRow key={p.user.telegram_id} p={p} />)}
+          </div>
+        </div>
+      )}
 
       <div className="grid gap-4" style={{ gridTemplateColumns: 'repeat(auto-fill,minmax(420px,1fr))' }}>
         {results.members.map(member => {
@@ -151,6 +198,54 @@ export default function Results() {
           )
         })}
       </div>
+
+      <QuestionnaireDrawer
+        open={questions}
+        onClose={() => setQuestions(false)}
+        scope="team"
+        id={round.team_id}
+        title={`Опросник — «${round.team_name}»`}
+      />
+    </div>
+  )
+}
+
+const STATE = {
+  done:        { label: 'прошли',    tone: 'ok'      as const, icon: Check },
+  in_progress: { label: 'в процессе', tone: 'accent' as const, icon: Hourglass },
+  not_started: { label: 'не начали',  tone: 'warn'   as const, icon: CircleDashed },
+}
+
+function ParticipantRow({ p }: { p: Participant }) {
+  const meta = STATE[p.state as keyof typeof STATE] ?? STATE.not_started
+  const Icon = meta.icon
+  const pct = p.total ? Math.round((p.completed / p.total) * 100) : 0
+
+  return (
+    <div className="flex items-center gap-3 px-3 py-2.5 rounded-xl
+                    bg-[var(--color-surface-2)] border border-[var(--color-border)]">
+      <Avatar name={p.user.display_name} url={p.user.photo_url} size={30} />
+      <div className="min-w-0 flex-1">
+        <div className="text-[13.5px] truncate flex items-center gap-1.5">
+          {p.user.display_name}
+          {!p.can_dm && (
+            <span title="Не открывал бота — опрос не доставлен">
+              <BellOff className="w-3 h-3 text-[var(--color-warning)] shrink-0" />
+            </span>
+          )}
+        </div>
+        <div className="h-1 mt-1.5 rounded-full bg-[var(--color-surface)] overflow-hidden">
+          <i className="block h-full rounded-full transition-all duration-700"
+             style={{
+               width: `${pct}%`,
+               background: p.state === 'done' ? 'var(--color-success)' : 'var(--gradient-accent)',
+             }} />
+        </div>
+      </div>
+      <span className="flex items-center gap-1.5 text-[11.5px] shrink-0"
+            style={{ color: p.state === 'done' ? 'var(--color-success)' : 'var(--color-muted)' }}>
+        <Icon className="w-3.5 h-3.5" /> {p.completed}/{p.total}
+      </span>
     </div>
   )
 }

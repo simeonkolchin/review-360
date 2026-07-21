@@ -6,6 +6,7 @@ import enum
 from datetime import datetime
 
 from sqlalchemy import (
+    JSON,
     BigInteger,
     Boolean,
     DateTime,
@@ -74,7 +75,12 @@ class Chat(Base):
 
 
 class Membership(Base):
-    """A user who enrolled themselves in a chat (tapped the join button)."""
+    """Someone the bot has seen in a chat.
+
+    The Bot API cannot enumerate a group's members, so this table is built up
+    from what Telegram does tell us: joins, admin lists, and anyone who writes
+    a message while the bot is present.
+    """
 
     __tablename__ = "memberships"
     __table_args__ = (UniqueConstraint("chat_id", "tg_user_id", name="uq_membership"),)
@@ -124,12 +130,32 @@ class TeamMember(Base):
 
 
 class Competency(Base):
+    """One question in a questionnaire.
+
+    Competencies live at three scopes, most specific first:
+
+        team_id set   → this team's own questionnaire
+        chat_id set   → the chat-wide questionnaire every team inherits
+        both null     → the built-in defaults, seeded on first boot
+
+    A team therefore starts with whatever the chat uses and only diverges once
+    someone edits it. Rows are deactivated rather than deleted when historical
+    answers point at them, so closed rounds keep making sense.
+    """
+
     __tablename__ = "competencies"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    name: Mapped[str] = mapped_column(String(128), unique=True)
+    name: Mapped[str] = mapped_column(String(128))
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     position: Mapped[int] = mapped_column(Integer, default=0)
+    chat_id: Mapped[int | None] = mapped_column(
+        ForeignKey("chats.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    team_id: Mapped[int | None] = mapped_column(
+        ForeignKey("teams.id", ondelete="CASCADE"), nullable=True, index=True
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)
 
 
 class ReviewRound(Base):
@@ -140,6 +166,9 @@ class ReviewRound(Base):
     status: Mapped[RoundStatus] = mapped_column(Enum(RoundStatus), default=RoundStatus.draft)
     # Random token used in the bot deep link: t.me/<bot>?start=<token>
     token: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    # Questionnaire as it stood when the round started. Snapshotting the ids
+    # means editing the team's questions later cannot rewrite finished results.
+    competency_ids: Mapped[list[int] | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     closed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 

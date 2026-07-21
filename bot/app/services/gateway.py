@@ -47,6 +47,29 @@ async def enroll(chat_id: int, chat_title: str, user, can_dm: bool = False,
     )
 
 
+async def forget(chat_id: int, telegram_id: int):
+    """Someone left the group — drop them from its roster."""
+    return await _request(
+        "POST",
+        "/bot/leave",
+        json={"telegram_chat_id": chat_id, "telegram_id": telegram_id},
+    )
+
+
+async def mark_reachable(user):
+    """Record that this person has opened the bot, so we may DM them."""
+    return await _request(
+        "POST",
+        "/bot/reachable",
+        json={
+            "telegram_id": user.id,
+            "username": user.username,
+            "first_name": user.first_name,
+            "last_name": user.last_name,
+        },
+    )
+
+
 async def get_tasks(token: str, telegram_id: int):
     return await _request("GET", "/bot/tasks", params={"token": token, "telegram_id": telegram_id})
 

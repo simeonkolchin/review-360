@@ -335,6 +335,213 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/questionnaire:
+    get:
+      tags:
+      - API
+      summary: Questionnaire used across a chat
+      operationId: chat_questionnaire_chats__chat_id__questionnaire_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - API
+      summary: Edit the chat questionnaire
+      operationId: save_chat_questionnaire_chats__chat_id__questionnaire_put
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/questionnaire/apply:
+    post:
+      tags:
+      - API
+      summary: Push the chat questionnaire onto every team
+      operationId: apply_chat_questionnaire_chats__chat_id__questionnaire_apply_post
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /teams/{team_id}/questionnaire:
+    get:
+      tags:
+      - API
+      summary: Questionnaire this team will use
+      operationId: team_questionnaire_teams__team_id__questionnaire_get
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    put:
+      tags:
+      - API
+      summary: Give this team its own questionnaire
+      operationId: save_team_questionnaire_teams__team_id__questionnaire_put
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/QuestionnaireRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+    delete:
+      tags:
+      - API
+      summary: Fall back to the chat questionnaire
+      operationId: reset_team_questionnaire_teams__team_id__questionnaire_delete
+      parameters:
+      - name: team_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Team Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /teams/{team_id}:
     delete:
       tags:
@@ -548,6 +755,74 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/EnrollRequest'
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/leave:
+    post:
+      tags:
+      - Bot
+      summary: Someone left the group
+      operationId: leave_bot_leave_post
+      parameters:
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
+  /bot/reachable:
+    post:
+      tags:
+      - Bot
+      summary: This user has opened the bot, so we may DM them
+      operationId: reachable_bot_reachable_post
+      parameters:
+      - name: x-bot-token
+        in: header
+        required: false
+        schema:
+          type: string
+          default: ''
+          title: X-Bot-Token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: true
+              title: Payload
       responses:
         '200':
           description: Successful Response
@@ -797,6 +1072,42 @@ components:
           title: Detail
       type: object
       title: HTTPValidationError
+    QuestionItem:
+      properties:
+        id:
+          anyOf:
+          - type: integer
+          - type: 'null'
+          title: Id
+        name:
+          type: string
+          maxLength: 128
+          minLength: 1
+          title: Name
+        description:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Description
+      type: object
+      required:
+      - name
+      title: QuestionItem
+      description: One question from the editor; `id` is absent for a newly added
+        one.
+    QuestionnaireRequest:
+      properties:
+        competencies:
+          items:
+            $ref: '#/components/schemas/QuestionItem'
+          type: array
+          maxItems: 20
+          minItems: 1
+          title: Competencies
+      type: object
+      required:
+      - competencies
+      title: QuestionnaireRequest
     ResponseItem:
       properties:
         competency_id:

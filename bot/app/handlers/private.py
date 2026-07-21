@@ -1,4 +1,9 @@
-"""Private-chat handlers: website login, the review itself, results."""
+"""Private-chat handlers: website login, the review itself, results.
+
+The review lives in a single message that keeps being edited — see
+`services/card.py` — so the dialogue stays one screen tall however many people
+and questions there are.
+"""
 
 import logging
 
@@ -12,7 +17,7 @@ from app.keyboards.inline import (
     comment_keyboard,
     score_keyboard,
 )
-from app.services import gateway
+from app.services import card, gateway
 from app.services.photos import get_avatar_file_id, get_avatar_url
 
 router = Router()
@@ -25,61 +30,64 @@ SESSIONS: dict[int, dict] = {}
 KIND_LABEL = {"self": "самооценка", "leader": "как лидер", "peer": "коллега"}
 
 
-def _progress_bar(done: int, total: int, width: int = 10) -> str:
+def _bar(done: int, total: int, width: int = 10) -> str:
     filled = round(width * done / total) if total else 0
     return "▰" * filled + "▱" * (width - filled)
 
 
-async def _ask_current(message: Message, telegram_id: int) -> None:
-    """Send the next question, or wrap up when everything is answered."""
+def _question_text(session: dict, assignment: dict, competency: dict) -> str:
+    total = len(session["assignments"])
+    pending = [a for a in session["assignments"] if not a["completed"]]
+    done = total - len(pending)
+    is_self = assignment["kind"] == "self"
+    who = "себя" if is_self else assignment["reviewee"]["display_name"]
+    index = session["competency_index"]
+
+    return (
+        f"{'🪞' if is_self else '👤'} <b>{who}</b>"
+        f"  <i>({KIND_LABEL.get(assignment['kind'], assignment['kind'])})</i>\n"
+        f"<code>{_bar(done, total)}</code>  {done}/{total} человек\n\n"
+        f"<b>{competency['name']}</b>\n"
+        f"<i>{competency.get('description') or ''}</i>\n\n"
+        f"Вопрос {index + 1} из {len(session['competencies'])} · "
+        f"оцените от 1 до {SCORE_MAX}"
+    )
+
+
+async def _ask_current(bot, chat_id: int, telegram_id: int) -> None:
+    """Redraw the card with the next question, or finish the review."""
     session = SESSIONS.get(telegram_id)
     if not session:
         return
 
     pending = [a for a in session["assignments"] if not a["completed"]]
     if not pending:
-        SESSIONS.pop(telegram_id, None)
-        await message.answer(
+        await card.close(
+            bot,
+            chat_id,
+            session.get("card"),
             "🎉 <b>Готово, спасибо!</b>\n\n"
             "Вы прошли оценку целиком. Результаты появятся, когда организатор "
             "закроет раунд — я пришлю уведомление.\n\n"
-            "Посмотреть свои результаты: /results"
+            "Посмотреть свои результаты: /results",
         )
+        SESSIONS.pop(telegram_id, None)
         return
 
     assignment = pending[0]
-    competencies = session["competencies"]
-    index = session["competency_index"]
-    competency = competencies[index]
+    competency = session["competencies"][session["competency_index"]]
+    # The face of the person stays on screen for their whole block — much easier
+    # to answer honestly when you can see who you are rating.
+    photo = None if assignment["kind"] == "self" else assignment.get("_avatar")
 
-    total = len(session["assignments"])
-    done = total - len(pending)
-
-    is_self = assignment["kind"] == "self"
-    who = "себя" if is_self else assignment["reviewee"]["display_name"]
-
-    header = (
-        f"{'🪞' if is_self else '👤'} <b>{who}</b>"
-        f"  <i>({KIND_LABEL.get(assignment['kind'], assignment['kind'])})</i>\n"
-        f"<code>{_progress_bar(done, total)}</code>  {done}/{total} человек\n\n"
-        f"<b>{competency['name']}</b>\n"
-        f"<i>{competency.get('description') or ''}</i>\n\n"
-        f"Вопрос {index + 1} из {len(competencies)} · оцените от 1 до {SCORE_MAX}"
+    session["card"] = await card.render(
+        bot,
+        chat_id,
+        session.get("card"),
+        _question_text(session, assignment, competency),
+        score_keyboard(assignment["id"], competency["id"]),
+        photo=photo,
     )
-
-    keyboard = score_keyboard(assignment["id"], competency["id"])
-    photo = assignment.get("_avatar")
-
-    # Show the person's face on the first question about them — much easier to
-    # answer honestly when you can see who you are rating.
-    if photo and index == 0 and not is_self:
-        try:
-            await message.answer_photo(photo=photo, caption=header, reply_markup=keyboard)
-            return
-        except Exception as exc:
-            logger.debug("photo send failed: %s", exc)
-
-    await message.answer(header, reply_markup=keyboard)
 
 
 async def _start_review(message: Message, token: str) -> None:
@@ -97,10 +105,11 @@ async def _start_review(message: Message, token: str) -> None:
         await message.answer("Вы уже прошли эту оценку ✅\n\nПосмотреть результаты: /results")
         return
 
-    # Preload avatars so questions can show a face
+    # Preload avatars so moving between people is a single edit, not a new message
     for assignment in tasks["assignments"]:
-        reviewee_id = assignment["reviewee"]["telegram_id"]
-        assignment["_avatar"] = await get_avatar_file_id(message.bot, reviewee_id)
+        assignment["_avatar"] = await get_avatar_file_id(
+            message.bot, assignment["reviewee"]["telegram_id"]
+        )
 
     SESSIONS[telegram_id] = {
         "token": token,
@@ -109,6 +118,7 @@ async def _start_review(message: Message, token: str) -> None:
         "competency_index": 0,
         "buffer": {},
         "awaiting_comment_for": None,
+        "card": None,
     }
 
     await message.answer(
@@ -119,7 +129,7 @@ async def _start_review(message: Message, token: str) -> None:
         f"без привязки к автору.\n"
         f"💾 Прогресс сохраняется — можно прерваться и вернуться."
     )
-    await _ask_current(message, telegram_id)
+    await _ask_current(message.bot, message.chat.id, telegram_id)
 
 
 @router.message(CommandStart(deep_link=True), F.chat.type == "private")
@@ -155,12 +165,14 @@ async def start(message: Message) -> None:
         "👋 <b>Review 360</b> — честная обратная связь для команды.\n\n"
         "<b>Как начать</b>\n"
         "1. Добавьте меня в рабочий чат\n"
-        "2. Отправьте там <code>/enroll</code> — коллеги нажмут «Участвую»\n"
-        "3. Соберите команду на сайте и запустите оценку\n\n"
-        "Опрос я пришлю каждому сюда, в личку. Кнопка ниже поможет выбрать чат.\n\n"
+        "2. Соберите команду на сайте и запустите оценку\n"
+        "3. Опрос придёт сюда, в личку — одним сообщением\n\n"
+        "Кнопка ниже поможет подключить чат, не выходя из диалога.\n\n"
         "<code>/results</code> — ваши результаты · <code>/help</code> — подробнее",
         reply_markup=chat_picker_keyboard(),
     )
+    # Opening the bot is what earns us the right to DM this person later.
+    await gateway.mark_reachable(message.from_user)
 
 
 @router.message(F.chat_shared)
@@ -174,8 +186,7 @@ async def chat_shared(message: Message) -> None:
     if result:
         await message.answer(
             f"✅ Чат <b>{title}</b> подключён.\n\n"
-            f"Теперь отправьте там <code>/enroll</code>, чтобы коллеги отметились, "
-            f"а затем соберите команду на сайте."
+            f"Участники подтягиваются автоматически — соберите команду на сайте."
         )
     else:
         await message.answer(
@@ -195,12 +206,6 @@ async def score_selected(query: CallbackQuery) -> None:
 
     session["buffer"][int(competency_id)] = int(score)
     await query.answer(f"Оценка {score} ✓")
-
-    try:
-        await query.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-
     session["competency_index"] += 1
 
     # Finished every competency for this person -> save, then offer a comment
@@ -220,18 +225,21 @@ async def score_selected(query: CallbackQuery) -> None:
         target = next(
             (a for a in session["assignments"] if a["id"] == int(assignment_id)), None
         )
-        who = "себе" if target and target["kind"] == "self" else (
-            target["reviewee"]["display_name"] if target else "коллеге"
-        )
-        await query.message.answer(
-            f"💬 Хотите добавить комментарий к <b>{who}</b>?\n\n"
-            f"<i>Напишите пару фраз — что получается хорошо, что стоит усилить. "
-            f"Текст покажут анонимно, вперемешку с другими.</i>",
-            reply_markup=comment_keyboard(int(assignment_id)),
+        is_self = bool(target and target["kind"] == "self")
+        who = "себе" if is_self else (target["reviewee"]["display_name"] if target else "коллеге")
+        session["card"] = await card.render(
+            query.bot,
+            query.message.chat.id,
+            session.get("card"),
+            f"💬 Добавить комментарий к <b>{who}</b>?\n\n"
+            f"<i>Напишите пару фраз прямо сюда — что получается хорошо, что стоит "
+            f"усилить. Текст покажут анонимно, вперемешку с другими.</i>",
+            comment_keyboard(int(assignment_id)),
+            photo=None if is_self else (target or {}).get("_avatar"),
         )
         return
 
-    await _ask_current(query.message, telegram_id)
+    await _ask_current(query.bot, query.message.chat.id, telegram_id)
 
 
 @router.callback_query(F.data.startswith("skipcomment:"))
@@ -240,11 +248,7 @@ async def skip_comment(query: CallbackQuery) -> None:
     if session:
         session["awaiting_comment_for"] = None
     await query.answer("Пропущено")
-    try:
-        await query.message.edit_reply_markup(reply_markup=None)
-    except Exception:
-        pass
-    await _ask_current(query.message, query.from_user.id)
+    await _ask_current(query.bot, query.message.chat.id, query.from_user.id)
 
 
 @router.message(F.text & ~F.text.startswith("/"), F.chat.type == "private")
@@ -266,8 +270,7 @@ async def free_text(message: Message) -> None:
         comment_only=True,
     )
     session["awaiting_comment_for"] = None
-    await message.answer("Спасибо, записал 🙏")
-    await _ask_current(message, telegram_id)
+    await _ask_current(message.bot, message.chat.id, telegram_id)
 
 
 @router.message(Command("results"), F.chat.type == "private")
@@ -318,10 +321,9 @@ async def help_command(message: Message) -> None:
         "Каждый в команде оценивает коллег и себя по нескольким компетенциям. "
         "Разница между самооценкой и взглядом команды — самое полезное в методе.\n\n"
         "<b>Порядок</b>\n"
-        "1. Добавьте меня в рабочий чат\n"
-        "2. <code>/enroll</code> в чате — коллеги жмут «Участвую»\n"
-        "3. На сайте соберите команду и запустите раунд\n"
-        "4. Я пришлю каждому опрос в личку\n\n"
+        "1. Добавьте меня в рабочий чат — участники подтянутся сами\n"
+        "2. На сайте соберите команду и запустите раунд\n"
+        "3. Я пришлю каждому опрос в личку, одним сообщением\n\n"
         "<b>Анонимность</b>\n"
         "Средние показываются, только когда ответили минимум 3 человека — "
         "иначе автора легко вычислить. Комментарии показываются вперемешку.\n\n"

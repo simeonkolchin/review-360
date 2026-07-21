@@ -28,6 +28,18 @@ class TeamCreateRequest(BaseModel):
     member_telegram_ids: list[int] = Field(default_factory=list)
 
 
+class QuestionItem(BaseModel):
+    """One question from the editor; `id` is absent for a newly added one."""
+
+    id: int | None = None
+    name: str = Field(min_length=1, max_length=128)
+    description: str | None = None
+
+
+class QuestionnaireRequest(BaseModel):
+    competencies: list[QuestionItem] = Field(min_length=1, max_length=20)
+
+
 class EnrollRequest(BaseModel):
     """Bot -> backend: a user tapped 'join' in a group, or started the bot."""
 

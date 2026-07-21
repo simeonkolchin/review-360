@@ -175,6 +175,49 @@ def main() -> int:
     )
     check("team with 1 member is rejected", status == 400, f"status={status}")
 
+    print("\n5b. Questionnaires: chat template and per-team override")
+    status, base = client.call("GET", f"/chats/{chat['id']}/questionnaire")
+    check("chat questionnaire falls back to defaults", status == 200 and base["source"] == "default",
+          f"status={status} source={base.get('source') if status == 200 else base}")
+    default_count = len(base["competencies"])
+
+    status, saved = client.call(
+        "PUT",
+        f"/chats/{chat['id']}/questionnaire",
+        {"competencies": [
+            {"name": "Коммуникация", "description": "Ясно доносит мысли"},
+            {"name": "Надёжность", "description": "Делает то, о чём договорились"},
+            {"name": "Инициатива", "description": None},
+        ]},
+    )
+    check("chat questionnaire saved", status == 200 and saved["source"] == "chat", f"status={status}")
+    check("chat questionnaire has 3 questions", len(saved["competencies"]) == 3,
+          f"got={len(saved['competencies']) if status == 200 else '-'}")
+    check("chat questions differ from defaults", len(saved["competencies"]) != default_count)
+
+    status, inherited = client.call("GET", f"/teams/{team['id']}/questionnaire")
+    check("team inherits the chat questionnaire", status == 200 and inherited["source"] == "chat",
+          f"source={inherited.get('source') if status == 200 else status}")
+
+    status, own = client.call(
+        "PUT",
+        f"/teams/{team['id']}/questionnaire",
+        {"competencies": [
+            {"name": "Скорость", "description": "Быстро доводит до результата"},
+            {"name": "Качество", "description": None},
+        ]},
+    )
+    check("team override saved", status == 200 and own["source"] == "team", f"status={status}")
+    check("team override has 2 questions", len(own["competencies"]) == 2)
+
+    status, still_chat = client.call("GET", f"/chats/{chat['id']}/questionnaire")
+    check("chat questionnaire untouched by the override",
+          status == 200 and len(still_chat["competencies"]) == 3,
+          f"got={len(still_chat['competencies']) if status == 200 else status}")
+
+    status, empty = client.call("PUT", f"/teams/{team['id']}/questionnaire", {"competencies": []})
+    check("empty questionnaire is rejected", status == 422, f"status={status}")
+
     print("\n6. Start the round")
     status, round_ = client.call("POST", f"/teams/{team['id']}/rounds")
     check("round started", status == 201, f"status={status} {round_}")
@@ -183,6 +226,12 @@ def main() -> int:
     # 4 people rating themselves and each other = 16 assignments
     check("16 assignments created", round_["total_assignments"] == 16,
           f"got={round_['total_assignments']}")
+    check("round uses the team's own questionnaire", len(round_["competencies"]) == 2,
+          f"got={len(round_.get('competencies', []))}")
+    check("progress lists every participant", len(round_["participants"]) == 4,
+          f"got={len(round_.get('participants', []))}")
+    check("everyone starts as not_started",
+          all(p["state"] == "not_started" for p in round_["participants"]))
 
     status, _ = client.call("POST", f"/teams/{team['id']}/rounds")
     check("second concurrent round is rejected", status == 409, f"status={status}")
@@ -238,6 +287,8 @@ def main() -> int:
 
     print("\n8. Progress and close")
     status, progress = client.call("GET", f"/rounds/{round_['id']}")
+    check("everyone shows as done", all(p["state"] == "done" for p in progress["participants"]),
+          f"states={[p['state'] for p in progress['participants']]}")
     check("all assignments completed", progress["completed_assignments"] == 16,
           f"got={progress['completed_assignments']}")
     check("all participants done", progress["participants_done"] == 4,
@@ -264,6 +315,24 @@ def main() -> int:
     comments = anna.get("comments") or []
     check("anonymous comments came through", len(comments) >= 3, f"got={len(comments)}")
     check("comments carry no author", all(isinstance(c, str) for c in comments))
+
+    print("\n9b. Editing questions later does not rewrite a finished round")
+    status, _ = client.call(
+        "PUT",
+        f"/teams/{team['id']}/questionnaire",
+        {"competencies": [{"name": "Совсем другое", "description": None}]},
+    )
+    check("questionnaire replaced after the round", status == 200, f"status={status}")
+    status, again = client.call("GET", f"/rounds/{round_['id']}/results")
+    check("closed round keeps its own questions", status == 200 and len(again["competencies"]) == 2,
+          f"got={len(again['competencies']) if status == 200 else status}")
+
+    status, applied = client.call("POST", f"/chats/{chat['id']}/questionnaire/apply")
+    check("apply to all teams works", status == 200 and applied["teams_reset"] >= 1,
+          f"result={applied}")
+    status, back = client.call("GET", f"/teams/{team['id']}/questionnaire")
+    check("team is back on the chat questionnaire", status == 200 and back["source"] == "chat",
+          f"source={back.get('source') if status == 200 else status}")
 
     print("\n10. Statistics were recorded")
     status, stats = client.call("GET", "/stats")

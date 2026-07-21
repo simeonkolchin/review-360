@@ -190,6 +190,57 @@ are re-read after a commit go through a small `_reload()` helper that expunges
 the identity map first, so the `selectin` loaders actually run instead of
 handing back a stale instance with unloaded relations.
 
+## Questionnaire scopes
+
+```mermaid
+flowchart TD
+    R["Round starts"] --> Q{"team has its<br/>own questions?"}
+    Q -->|yes| T["team_id = this team"]
+    Q -->|no| C{"chat has its<br/>own questions?"}
+    C -->|yes| CH["chat_id = this chat"]
+    C -->|no| D["defaults<br/>chat_id = team_id = null"]
+    T --> S["snapshot ids into<br/>review_rounds.competency_ids"]
+    CH --> S
+    D --> S
+    S --> U["every task, result and<br/>completion check reads the snapshot"]
+
+    classDef n fill:#1a2340,stroke:#3b82f6,color:#e8eef6
+    classDef ok fill:#16241f,stroke:#4ade80,color:#e8eef6
+    class R,Q,C,T,CH,D n
+    class S,U ok
+```
+
+`Competency` rows carry `chat_id` and `team_id`; both null means the seeded
+default set. Resolution walks team → chat → default and stops at the first
+scope that has any active rows, so a team inherits silently until someone
+saves an override.
+
+Two invariants keep old rounds readable:
+
+* **Snapshot on start.** `review_rounds.competency_ids` freezes the list, so
+  editing questions afterwards cannot change what a finished round meant — and
+  the "is this assignment complete?" check counts against the same snapshot
+  rather than whatever rows exist now.
+* **Deactivate, never delete.** A question with answers behind it gets
+  `is_active = false` instead of a `DELETE`, so historical responses keep their
+  label.
+
+## Roster
+
+There is no API that lists a group's members, so `memberships` is assembled
+from three sources, none of which needs the user to press anything:
+
+| Source | Covers |
+|---|---|
+| `getChatAdministrators` | every admin, immediately, with photos |
+| `chat_member` updates | anyone joining or leaving while the bot is present |
+| any group message | the author — in practice this is what fills the list |
+
+`can_dm` is separate and stricter: it flips only when the person opens a private
+chat with the bot, because that is the moment Telegram lets us message them. The
+round announcement carries a personal deep link precisely to trigger it, and the
+dashboard flags anyone still unreachable.
+
 ## Aggregation
 
 ```mermaid

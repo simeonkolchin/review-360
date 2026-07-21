@@ -40,6 +40,30 @@ class CompetencyResponse(BaseModel):
     description: str | None = None
 
 
+class QuestionnaireResponse(BaseModel):
+    """Which questionnaire applies, and where it came from.
+
+    `source` is what lets the UI say "inherited from the chat" instead of
+    pretending every team configured itself.
+    """
+
+    source: str  # team | chat | default
+    competencies: list[CompetencyResponse]
+
+
+class ParticipantProgress(BaseModel):
+    """Where one reviewer is in the round — the live view a leader watches."""
+
+    user: UserResponse
+    # not_started — has not answered anything yet
+    # in_progress — some answers submitted
+    # done        — every assignment finished
+    state: str
+    completed: int
+    total: int
+    can_dm: bool
+
+
 class RoundProgressResponse(BaseModel):
     id: int
     team_id: int
@@ -51,6 +75,8 @@ class RoundProgressResponse(BaseModel):
     completed_assignments: int
     participants_done: int
     participants_total: int
+    participants: list[ParticipantProgress] = []
+    competencies: list["CompetencyResponse"] = []
 
 
 class CompetencyScore(BaseModel):

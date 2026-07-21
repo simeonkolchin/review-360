@@ -4,7 +4,7 @@ import re
 
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 
-from app.schemas.requests import TeamCreateRequest
+from app.schemas.requests import QuestionnaireRequest, TeamCreateRequest
 from app.services import data_client
 from app.services.security import get_current_user_id
 from app.services.telegram import deep_link, fetch_file, mention, send_message
@@ -72,6 +72,62 @@ async def create_team(
         "team_created", telegram_id, team_id=team["id"], members=len(team["members"])
     )
     return team
+
+
+# ------------------------------------------------------------------ questionnaires
+
+
+@router.get("/chats/{chat_id}/questionnaire", summary="Questionnaire used across a chat")
+async def chat_questionnaire(chat_id: int, _: int = Depends(get_current_user_id)):
+    return await data_client.get(f"/chats/{chat_id}/questionnaire")
+
+
+@router.put("/chats/{chat_id}/questionnaire", summary="Edit the chat questionnaire")
+async def save_chat_questionnaire(
+    chat_id: int, payload: QuestionnaireRequest, telegram_id: int = Depends(get_current_user_id)
+):
+    saved = await data_client.put(
+        f"/chats/{chat_id}/questionnaire", json=payload.model_dump()
+    )
+    await data_client.record_event(
+        "questionnaire_saved", telegram_id, scope="chat", chat_id=chat_id,
+        questions=len(saved["competencies"]),
+    )
+    return saved
+
+
+@router.post(
+    "/chats/{chat_id}/questionnaire/apply",
+    summary="Push the chat questionnaire onto every team",
+)
+async def apply_chat_questionnaire(chat_id: int, telegram_id: int = Depends(get_current_user_id)):
+    result = await data_client.post(f"/chats/{chat_id}/questionnaire/apply")
+    await data_client.record_event("questionnaire_applied", telegram_id, chat_id=chat_id, **result)
+    return result
+
+
+@router.get("/teams/{team_id}/questionnaire", summary="Questionnaire this team will use")
+async def team_questionnaire(team_id: int, _: int = Depends(get_current_user_id)):
+    return await data_client.get(f"/teams/{team_id}/questionnaire")
+
+
+@router.put("/teams/{team_id}/questionnaire", summary="Give this team its own questionnaire")
+async def save_team_questionnaire(
+    team_id: int, payload: QuestionnaireRequest, telegram_id: int = Depends(get_current_user_id)
+):
+    saved = await data_client.put(f"/teams/{team_id}/questionnaire", json=payload.model_dump())
+    await data_client.record_event(
+        "questionnaire_saved", telegram_id, scope="team", team_id=team_id,
+        questions=len(saved["competencies"]),
+    )
+    return saved
+
+
+@router.delete("/teams/{team_id}/questionnaire", summary="Fall back to the chat questionnaire")
+async def reset_team_questionnaire(team_id: int, telegram_id: int = Depends(get_current_user_id)):
+    result = await data_client.delete(f"/teams/{team_id}/questionnaire")
+    await data_client.record_event("questionnaire_reset", telegram_id, team_id=team_id)
+    return result
 
 
 @router.delete("/teams/{team_id}", summary="Delete a team")

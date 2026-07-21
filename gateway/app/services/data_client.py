@@ -46,6 +46,10 @@ async def post(path: str, **kwargs):
     return await request("POST", path, **kwargs)
 
 
+async def put(path: str, **kwargs):
+    return await request("PUT", path, **kwargs)
+
+
 async def delete(path: str, **kwargs):
     return await request("DELETE", path, **kwargs)
 
