@@ -3,10 +3,11 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
-  MoreVertical, LogOut, AlertTriangle, ShieldAlert, RefreshCw, Loader2,
+  MoreVertical, LogOut, AlertTriangle, ShieldAlert, RefreshCw, Loader2, UserX, Plus,
 } from 'lucide-react'
 import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
 import { useLive } from '../api/live'
+import { useAuthConfig, botLink } from '../api/config'
 import { Avatar, ChatAvatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
 import QuestionnaireDrawer from '../components/QuestionnaireDrawer'
@@ -24,6 +25,9 @@ export default function ChatDetail() {
   // are an admin — the two facts that explain a short roster.
   const tgLive = useLive<TelegramStatus>(chatId ? `/chats/${chatId}/telegram` : null, 30000)
   const tg = tgLive.data
+  const config = useAuthConfig()
+  // Same invite link as the dashboard, admin rights requested up front.
+  const inviteBack = botLink(config?.bot_username ?? '', '?startgroup=true&admin=invite_users')
   const members = live.data ?? []
   const teams = teamsLive.data ?? []
   const chat = chatsLive.data?.find(c => String(c.id) === chatId)
@@ -157,8 +161,37 @@ export default function ChatDetail() {
         </div>
       </div>
 
+      {/* Removed from the group — the data is still here, so offer both ways out. */}
+      {tg && tg.bot_in_chat === false && (
+        <div className="card p-5 mb-5"
+             style={{ borderColor: 'rgba(255,77,94,.35)', background: 'rgba(255,77,94,.06)' }}>
+          <div className="flex gap-3 items-start">
+            <UserX className="w-5 h-5 shrink-0 mt-0.5 text-[var(--color-danger)]" />
+            <div className="flex-1">
+              <h3 className="text-[15px] m-0 mb-1">Бота нет в группе</h3>
+              <p className="text-[13px] text-[var(--color-text-secondary)] m-0">
+                Его исключили из «{chat?.title ?? 'чата'}» — новые участники и оценки
+                оттуда больше не приходят. Данные ({members.length} участник(ов),
+                {' '}{teams.length} команд(ы)) пока сохранены.
+              </p>
+              <div className="flex gap-2 mt-4 flex-wrap">
+                <a href={inviteBack} target="_blank" rel="noreferrer"
+                   className="btn btn-primary px-4 py-2.5 no-underline">
+                  <Plus className="w-4 h-4" /> Вернуть бота в группу
+                </a>
+                <button className="btn btn-ghost px-4 py-2.5"
+                        style={{ color: 'var(--color-danger)', borderColor: 'rgba(255,77,94,.4)' }}
+                        onClick={() => setConfirmDeleteChat(true)}>
+                  <Trash2 className="w-4 h-4" /> Удалить чат и все данные
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Telegram will not hand over a member list; say so plainly when it shows. */}
-      {tg && tg.bot_is_admin === false && (
+      {tg && tg.bot_in_chat !== false && tg.bot_is_admin === false && (
         <div className="card p-4 mb-5 flex gap-3 items-start"
              style={{ borderColor: 'rgba(255,176,32,.35)', background: 'rgba(255,176,32,.06)' }}>
           <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[var(--color-warning)]" />

@@ -84,13 +84,22 @@ async def chat_status(chat_id: int) -> dict:
     the site may be shorter than the group really is.
     """
     status: dict = {
-        "member_count": None, "bot_is_admin": None, "photo_url": None, "migrate_to": None,
+        "member_count": None, "bot_is_admin": None, "photo_url": None,
+        "migrate_to": None, "bot_in_chat": None,
     }
 
     probe = await _api("getChat", {"chat_id": chat_id})
     moved = migration_target(probe)
     if moved:
         status["migrate_to"] = moved
+        return status
+
+    if probe and not probe.get("ok"):
+        # Removed from the group: Telegram stops answering about the chat at all.
+        description = (probe.get("description") or "").lower()
+        if any(hint in description for hint in ("not a member", "chat not found", "kicked",
+                                                "not enough rights", "forbidden")):
+            status["bot_in_chat"] = False
         return status
 
     total = await _call("getChatMemberCount", {"chat_id": chat_id})
@@ -103,7 +112,9 @@ async def chat_status(chat_id: int) -> dict:
             "getChatMember", {"chat_id": chat_id, "user_id": me["id"]}
         )
         if membership:
-            status["bot_is_admin"] = membership.get("status") in {"administrator", "creator"}
+            own = membership.get("status")
+            status["bot_is_admin"] = own in {"administrator", "creator"}
+            status["bot_in_chat"] = own not in {"left", "kicked"}
 
     # Groups often get their photo after the bot joins — pick it up on the way past.
     chat = (probe or {}).get("result") or {}

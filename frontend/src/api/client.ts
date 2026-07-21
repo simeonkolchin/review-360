@@ -35,6 +35,8 @@ export interface TelegramStatus {
   /** how many Telegram counts in the group, null when it would not say */
   member_count: number | null
   bot_is_admin: boolean | null
+  /** false once the bot has been removed from the group */
+  bot_in_chat: boolean | null
 }
 export interface Question { id: number | null; name: string; description: string | null }
 export interface Questionnaire {

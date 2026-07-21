@@ -112,6 +112,7 @@ async def chat_telegram_status(chat_id: int, telegram_id: int = Depends(get_curr
         "known": chat["member_count"],
         "member_count": info["member_count"],
         "bot_is_admin": info["bot_is_admin"],
+        "bot_in_chat": info["bot_in_chat"],
     }
 
 
