@@ -1,13 +1,41 @@
 """Public API consumed by the frontend. Every endpoint requires a session."""
 
-from fastapi import APIRouter, Depends, status
+import re
+
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 
 from app.schemas.requests import TeamCreateRequest
 from app.services import data_client
 from app.services.security import get_current_user_id
-from app.services.telegram import deep_link, mention, send_message
+from app.services.telegram import deep_link, fetch_file, mention, send_message
 
 router = APIRouter()
+
+# Telegram file paths look like "photos/file_12.jpg" — nothing else is allowed
+# through, so this endpoint can never be pointed somewhere it should not go.
+SAFE_FILE_PATH = re.compile(r"^[\w][\w./-]{0,127}$")
+
+
+@router.get("/avatar/{file_path:path}", summary="Proxy a Telegram profile photo")
+async def avatar(file_path: str, _: int = Depends(get_current_user_id)):
+    """Serve an avatar without ever exposing the bot token to the browser.
+
+    The bot stores `tg:<file_path>`; the frontend asks for it here and we stream
+    the bytes back — which also works for clients that cannot reach Telegram.
+    """
+    if ".." in file_path or not SAFE_FILE_PATH.match(file_path):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Bad file path")
+
+    result = await fetch_file(file_path)
+    if result is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Avatar unavailable")
+
+    content, content_type = result
+    return Response(
+        content=content,
+        media_type=content_type,
+        headers={"Cache-Control": "private, max-age=86400"},
+    )
 
 
 @router.get("/chats", summary="Chats I belong to")

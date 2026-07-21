@@ -13,7 +13,7 @@ from app.keyboards.inline import (
     score_keyboard,
 )
 from app.services import gateway
-from app.services.photos import get_avatar_url
+from app.services.photos import get_avatar_file_id, get_avatar_url
 
 router = Router()
 logger = logging.getLogger(__name__)
@@ -100,7 +100,7 @@ async def _start_review(message: Message, token: str) -> None:
     # Preload avatars so questions can show a face
     for assignment in tasks["assignments"]:
         reviewee_id = assignment["reviewee"]["telegram_id"]
-        assignment["_avatar"] = await get_avatar_url(message.bot, reviewee_id)
+        assignment["_avatar"] = await get_avatar_file_id(message.bot, reviewee_id)
 
     SESSIONS[telegram_id] = {
         "token": token,

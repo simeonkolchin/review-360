@@ -4,7 +4,7 @@ import logging
 
 import httpx
 
-from app import TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME
+from app import TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME, TELEGRAM_PROXY
 
 logger = logging.getLogger(__name__)
 
@@ -24,6 +24,27 @@ def mention(display_name: str, telegram_id: int) -> str:
     return f'<a href="tg://user?id={telegram_id}">{safe}</a>'
 
 
+async def fetch_file(file_path: str) -> tuple[bytes, str] | None:
+    """Download a file from Telegram by its `getFile` path.
+
+    The download URL carries the bot token, so this always happens server-side;
+    callers get raw bytes to hand to the browser.
+    """
+    if not TELEGRAM_BOT_TOKEN:
+        return None
+    url = f"{API_BASE}/file/bot{TELEGRAM_BOT_TOKEN}/{file_path}"
+    try:
+        async with httpx.AsyncClient(timeout=15.0, proxy=TELEGRAM_PROXY or None) as client:
+            response = await client.get(url)
+        if response.status_code != 200:
+            logger.warning("file download failed: %s", response.status_code)
+            return None
+        return response.content, response.headers.get("content-type", "image/jpeg")
+    except Exception as exc:
+        logger.warning("file download error: %s", exc)
+        return None
+
+
 async def send_message(chat_id: int, text: str, reply_markup: dict | None = None) -> bool:
     if not TELEGRAM_BOT_TOKEN:
         logger.warning("TELEGRAM_BOT_TOKEN not set — skipping sendMessage to %s", chat_id)
@@ -39,7 +60,7 @@ async def send_message(chat_id: int, text: str, reply_markup: dict | None = None
         payload["reply_markup"] = reply_markup
 
     try:
-        async with httpx.AsyncClient(timeout=10.0) as client:
+        async with httpx.AsyncClient(timeout=10.0, proxy=TELEGRAM_PROXY or None) as client:
             response = await client.post(
                 f"{API_BASE}/bot{TELEGRAM_BOT_TOKEN}/sendMessage", json=payload
             )

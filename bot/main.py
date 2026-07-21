@@ -4,9 +4,10 @@ import sys
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.default import DefaultBotProperties
+from aiogram.client.session.aiohttp import AiohttpSession
 from aiogram.enums import ParseMode
 
-from app import APP_NAME, LOG_LEVEL, TELEGRAM_BOT_TOKEN
+from app import APP_NAME, LOG_LEVEL, TELEGRAM_BOT_TOKEN, TELEGRAM_PROXY
 from app.handlers import group, private
 
 logging.basicConfig(
@@ -22,8 +23,15 @@ async def main() -> None:
         logger.error("TELEGRAM_BOT_TOKEN is not set — the bot cannot start")
         sys.exit(1)
 
+    # Hosts that cannot route to api.telegram.org directly send every call
+    # through a proxy instead; empty TELEGRAM_PROXY means a direct connection.
+    session = AiohttpSession(proxy=TELEGRAM_PROXY) if TELEGRAM_PROXY else None
+    if TELEGRAM_PROXY:
+        logger.info("Talking to Telegram through a proxy")
+
     bot = Bot(
         token=TELEGRAM_BOT_TOKEN,
+        session=session,
         default=DefaultBotProperties(parse_mode=ParseMode.HTML),
     )
     dispatcher = Dispatcher()

@@ -165,6 +165,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /avatar/{file_path}:
+    get:
+      tags:
+      - API
+      summary: Proxy a Telegram profile photo
+      description: 'Serve an avatar without ever exposing the bot token to the browser.
+
+
+        The bot stores `tg:<file_path>`; the frontend asks for it here and we stream
+
+        the bytes back — which also works for clients that cannot reach Telegram.'
+      operationId: avatar_avatar__file_path__get
+      parameters:
+      - name: file_path
+        in: path
+        required: true
+        schema:
+          type: string
+          title: File Path
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats:
     get:
       tags:

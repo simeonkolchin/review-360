@@ -35,6 +35,10 @@ REQUEST_TIMEOUT_SEC = _env_int("REQUEST_TIMEOUT_SEC", 30)
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_BOT_USERNAME = os.getenv("TELEGRAM_BOT_USERNAME", "")
+# Optional SOCKS5/HTTP proxy for reaching api.telegram.org.
+# Some hosts cannot route to Telegram directly; leave empty when they can.
+TELEGRAM_PROXY = os.getenv("TELEGRAM_PROXY", "").strip()
+
 
 # Auth
 JWT_SECRET = os.getenv("JWT_SECRET", "change-me-in-production")

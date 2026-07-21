@@ -19,9 +19,12 @@ export function Pill({ children, tone = 'default' }: {
 
 export function Avatar({ name, url, size = 34 }: { name: string; url?: string | null; size?: number }) {
   const initials = (name || '?').trim().split(/\s+/).map(w => w[0]).slice(0, 2).join('').toUpperCase()
-  if (url) {
+  // The bot stores "tg:<file path>" — the real download URL carries the bot
+  // token, so the gateway streams those bytes for us instead.
+  const src = url?.startsWith('tg:') ? `/api/avatar/${url.slice(3)}` : url
+  if (src) {
     return (
-      <img src={url} alt={name} referrerPolicy="no-referrer"
+      <img src={src} alt={name} referrerPolicy="no-referrer"
         className="rounded-[10px] object-cover shrink-0"
         style={{ width: size, height: size }} />
     )
