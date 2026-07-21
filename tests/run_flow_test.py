@@ -111,7 +111,35 @@ def main() -> int:
     status, _ = client.call(
         "POST", "/auth/dev-login", {"telegram_id": PEOPLE[0][0], "first_name": PEOPLE[0][2]}
     )
-    check("dev-login works", status == 200, f"status={status}")
+    if status == 403:
+        # Production has dev-login switched off, as it should — drive the real
+        # login instead: mint a one-time token, confirm it the way the bot does,
+        # then exchange it for the session cookie.
+        print(f"  {DIM}dev-login disabled — using the bot login bridge{RESET}")
+        status, link = client.call("POST", "/auth/login-link")
+        check("login link issued", status == 200 and link.get("token"), f"status={status}")
+        token = link["token"]
+
+        status, _ = client.call(
+            "POST",
+            "/bot/confirm-login",
+            {
+                "token": token,
+                "telegram_id": PEOPLE[0][0],
+                "first_name": PEOPLE[0][2],
+                "username": PEOPLE[0][1],
+            },
+            bot=True,
+        )
+        check("bot confirmed the login", status == 200, f"status={status}")
+
+        status, user = client.call("GET", "/auth/login-status", params={"token": token})
+        check("session cookie issued", status == 200 and client.cookie, f"status={status}")
+
+        status, _ = client.call("GET", "/auth/login-status", params={"token": token})
+        check("login token is single-use", status == 409, f"status={status}")
+    else:
+        check("dev-login works", status == 200, f"status={status}")
 
     status, chats = client.call("GET", "/chats")
     check("chat is visible", status == 200 and len(chats) >= 1, f"status={status}")

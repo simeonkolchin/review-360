@@ -8,7 +8,7 @@
 
 [![Live](https://img.shields.io/badge/live-tgreview360.ru-3b82f6)](https://tgreview360.ru)
 [![Bot](https://img.shields.io/badge/bot-@tgreview360bot-2CA5E0?logo=telegram&logoColor=white)](https://t.me/tgreview360bot)
-[![Python](https://img.shields.io/badge/Python-3.12-3776AB?logo=python&logoColor=white)](https://www.python.org/)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://www.python.org/)
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![aiogram](https://img.shields.io/badge/aiogram-3.x-2CA5E0?logo=telegram&logoColor=white)](https://aiogram.dev/)
 [![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://react.dev/)

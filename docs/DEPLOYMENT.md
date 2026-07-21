@@ -53,7 +53,8 @@ The domain needs two A records pointing at the host's public address:
 | A | `@` | server's public IP |
 | A | `www` | server's public IP |
 
-Nothing else — no CNAME, no MX for this to work. Propagation is usually minutes
+Nothing else. On a dynamic home IP the record has to be kept in sync by hand or
+by a script — the certificate renewal fails silently otherwise. Propagation is usually minutes
 on `.ru` at reg.ru, occasionally a couple of hours.
 
 ## Bringing the stack up
@@ -99,9 +100,20 @@ docker run --rm \
   --agree-tos --no-eff-email -m <email> --non-interactive
 ```
 
-Renewal runs the same way from a timer; after each renewal the edge proxy is
-reloaded (`docker exec edge-proxy nginx -s reload`) so it picks up the new
-certificate without dropping connections.
+Renewal is a weekly cron entry doing the same thing, followed by a reload so the
+proxy picks up the new certificate without dropping connections:
+
+```cron
+23 3 * * 1 docker run --rm --dns 1.1.1.1 --dns 8.8.8.8 \
+  -v /etc/letsencrypt:/etc/letsencrypt -v /var/lib/letsencrypt:/var/lib/letsencrypt \
+  -v /mnt/data/proxy/certbot-webroot:/var/www/certbot \
+  certbot/certbot renew --cert-name tgreview360.ru --webroot -w /var/www/certbot --quiet \
+  && docker exec edge-proxy nginx -s reload
+```
+
+Verify it end to end with `--dry-run` before trusting it. The host's own
+`certbot.timer` cannot renew this lineage: its `webroot_path` points at
+`/var/www/certbot`, which only exists inside the container.
 
 ## Edge proxy configuration
 
@@ -167,7 +179,7 @@ networks:
 
 ## Host-specific notes for this server
 
-Two quirks of this particular machine, worth knowing before debugging:
+Three quirks of this particular machine, worth knowing before debugging:
 
 - **Docker Hub is unreachable** from it (geo-blocked), so images are built on a
   workstation for `linux/amd64` and pushed through a **local registry exposed
@@ -186,18 +198,27 @@ Two quirks of this particular machine, worth knowing before debugging:
   Only missing layers travel, so subsequent deploys are small even on a slow
   uplink.
 
-- **`systemd-resolved` on the host is not answering**, so containers that need
-  outbound DNS get explicit resolvers through an untracked
-  `docker-compose.override.yaml`:
+- **`systemd-resolved` on the host is not answering** — its only upstream is the
+  router, which times out. Containers that need outbound DNS therefore get
+  explicit resolvers through an untracked `docker-compose.override.yaml`, and
+  one-off containers (certbot) need `--dns 1.1.1.1` on the command line.
+
+- **Telegram is not routable from this host at all** (`Network is unreachable`).
+  Both the bot and the gateway go through the AmneziaWG SOCKS proxy that already
+  runs on the machine:
+
+  ```ini
+  TELEGRAM_PROXY=socks5://user:pass@host.docker.internal:11080
+  ```
 
   ```yaml
   services:
-    bot:
-      dns: [8.8.8.8, 1.1.1.1]
+    bot:      {dns: [8.8.8.8, 1.1.1.1], extra_hosts: ["host.docker.internal:host-gateway"]}
+    gateway:  {dns: [8.8.8.8, 1.1.1.1], extra_hosts: ["host.docker.internal:host-gateway"]}
   ```
 
-  Only the bot needs it — everything else talks to service names, which Docker's
-  embedded DNS resolves on its own.
+  Leave `TELEGRAM_PROXY` empty anywhere Telegram is reachable directly — the
+  code then opens a plain connection.
 
 ## Verifying a deploy
 
