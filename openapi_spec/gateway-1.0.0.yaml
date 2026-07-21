@@ -335,6 +335,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/HTTPValidationError'
+  /chats/{chat_id}/telegram:
+    get:
+      tags:
+      - API
+      summary: What Telegram says about this group
+      description: 'Explain a short roster: how many people the group really has,
+        and whether
+
+        the bot is an admin — without which it cannot see anyone who is not writing
+
+        to it directly.'
+      operationId: chat_telegram_status_chats__chat_id__telegram_get
+      parameters:
+      - name: chat_id
+        in: path
+        required: true
+        schema:
+          type: integer
+          title: Chat Id
+      - name: review360_token
+        in: cookie
+        required: false
+        schema:
+          anyOf:
+          - type: string
+          - type: 'null'
+          title: Review360 Token
+      responses:
+        '200':
+          description: Successful Response
+          content:
+            application/json:
+              schema: {}
+        '422':
+          description: Validation Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HTTPValidationError'
   /chats/{chat_id}/questionnaire:
     get:
       tags:

@@ -8,6 +8,7 @@ from app.schemas.requests import QuestionnaireRequest, TeamCreateRequest
 from app.services import data_client
 from app.services.security import get_current_user_id
 from app.services.telegram import (
+    chat_status,
     deep_link,
     fetch_file,
     leave_chat as telegram_leave,
@@ -78,6 +79,31 @@ async def create_team(
         "team_created", telegram_id, team_id=team["id"], members=len(team["members"])
     )
     return team
+
+
+@router.get("/chats/{chat_id}/telegram", summary="What Telegram says about this group")
+async def chat_telegram_status(chat_id: int, telegram_id: int = Depends(get_current_user_id)):
+    """Explain a short roster: how many people the group really has, and whether
+    the bot is an admin — without which it cannot see anyone who is not writing
+    to it directly."""
+    chats = await data_client.get("/chats", params={"telegram_id": telegram_id})
+    chat = next((c for c in chats if c["id"] == chat_id), None)
+    if chat is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Chat not found")
+
+    info = await chat_status(chat["telegram_chat_id"])
+
+    # The group photo is usually set after the bot joins; save it when it shows up.
+    if info["photo_url"] and info["photo_url"] != chat.get("photo_url"):
+        await data_client.post(
+            f"/chats/{chat_id}/photo", json={"photo_url": info["photo_url"]}
+        )
+
+    return {
+        "known": chat["member_count"],
+        "member_count": info["member_count"],
+        "bot_is_admin": info["bot_is_admin"],
+    }
 
 
 # ------------------------------------------------------------------ questionnaires

@@ -29,6 +29,13 @@ export interface User { telegram_id: number; username: string | null; display_na
 export interface Member extends User { can_dm: boolean; is_admin: boolean }
 export interface Chat { id: number; telegram_chat_id: number; title: string; photo_url: string | null; member_count: number; team_count: number }
 export interface Team { id: number; name: string; leader: User | null; members: User[]; active_round_id: number | null }
+export interface TelegramStatus {
+  /** members we know about */
+  known: number
+  /** how many Telegram counts in the group, null when it would not say */
+  member_count: number | null
+  bot_is_admin: boolean | null
+}
 export interface Question { id: number | null; name: string; description: string | null }
 export interface Questionnaire {
   /** which scope the questions actually came from: team | chat | default */

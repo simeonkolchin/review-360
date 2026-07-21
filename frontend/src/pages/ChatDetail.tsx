@@ -3,9 +3,9 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import {
   ArrowLeft, Play, Trash2, BarChart3, Crown, GripVertical,
   UserPlus, Users, X, Sparkles, SlidersHorizontal, ListChecks,
-  MoreVertical, LogOut, AlertTriangle,
+  MoreVertical, LogOut, AlertTriangle, ShieldAlert,
 } from 'lucide-react'
-import { api, type Chat, type Member, type Team } from '../api/client'
+import { api, type Chat, type Member, type Team, type TelegramStatus } from '../api/client'
 import { useLive } from '../api/live'
 import { Avatar, ChatAvatar, EmptyState, Pill } from '../components/ui'
 import Modal from '../components/Modal'
@@ -20,6 +20,10 @@ export default function ChatDetail() {
   const live = useLive<Member[]>(chatId ? `/chats/${chatId}/members` : null, 5000)
   const teamsLive = useLive<Team[]>(chatId ? `/chats/${chatId}/teams` : null, 5000)
   const chatsLive = useLive<Chat[]>('/chats', 15000)
+  // Telegram's own view of the group: how many people it has, and whether we
+  // are an admin — the two facts that explain a short roster.
+  const tgLive = useLive<TelegramStatus>(chatId ? `/chats/${chatId}/telegram` : null, 30000)
+  const tg = tgLive.data
   const members = live.data ?? []
   const teams = teamsLive.data ?? []
   const chat = chatsLive.data?.find(c => String(c.id) === chatId)
@@ -134,6 +138,26 @@ export default function ChatDetail() {
           )}
         </div>
       </div>
+
+      {/* Telegram will not hand over a member list; say so plainly when it shows. */}
+      {tg && tg.bot_is_admin === false && (
+        <div className="card p-4 mb-5 flex gap-3 items-start"
+             style={{ borderColor: 'rgba(255,176,32,.35)', background: 'rgba(255,176,32,.06)' }}>
+          <ShieldAlert className="w-4 h-4 shrink-0 mt-0.5 text-[var(--color-warning)]" />
+          <div className="text-[13px] leading-relaxed">
+            <b>Бот не администратор группы.</b>{' '}
+            {typeof tg.member_count === 'number' && (
+              <>В группе {tg.member_count} человек(а), а видно {tg.known}. </>
+            )}
+            Telegram не выдаёт ботам список участников: без прав администратора бот
+            не видит и сообщения остальных, поэтому список пополняется медленно.
+            <div className="text-[12.5px] text-[var(--color-muted)] mt-1.5">
+              Откройте настройки группы → Администраторы → добавьте бота. Остальные
+              появятся здесь автоматически.
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ---------------- team builder ---------------- */}
       <div className="grid gap-4 mb-10 md:grid-cols-[1fr_1.15fr]">

@@ -190,6 +190,17 @@ async def enroll(payload: EnrollRequest, session: AsyncSession = Depends(get_ses
     return {"chat_id": chat.id, "telegram_id": user.telegram_id, "enrolled": True}
 
 
+@router.post("/chats/{chat_id}/photo", dependencies=[Depends(require_service_token)])
+async def set_chat_photo(chat_id: int, payload: dict, session: AsyncSession = Depends(get_session)):
+    """Store the group photo the gateway noticed on Telegram."""
+    chat = await session.get(Chat, chat_id)
+    if chat is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Chat not found")
+    chat.photo_url = payload.get("photo_url")
+    await session.commit()
+    return {"photo_url": chat.photo_url}
+
+
 @router.delete("/chats/{chat_id}", dependencies=[Depends(require_service_token)])
 async def delete_chat(chat_id: int, telegram_id: int, session: AsyncSession = Depends(get_session)):
     """Erase a chat and everything collected in it.
