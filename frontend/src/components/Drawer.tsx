@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useBodyScrollLock } from './useBodyScrollLock'
 
 /** Keep the panel mounted long enough to play the closing animation. */
 const CLOSE_MS = 260
@@ -43,16 +44,13 @@ export default function Drawer({
     if (open) { setMounted(true); setClosing(false) }
   }, [open])
 
+  useBodyScrollLock(mounted)
+
   useEffect(() => {
     if (!mounted) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && requestClose()
     document.addEventListener('keydown', onKey)
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = previous
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [mounted, requestClose])
 
   if (!mounted) return null

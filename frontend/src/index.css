@@ -29,6 +29,11 @@ html {
   font-family: var(--font-sans); color: var(--color-text);
   background: linear-gradient(180deg, var(--color-bg), var(--color-bg-2));
   background-attachment: fixed;
+  /* Keep the scrollbar gutter reserved at all times. Locking body scroll for a
+     modal or drawer would otherwise remove the bar and shift the page sideways. */
+  scrollbar-gutter: stable;
+  scrollbar-width: thin;
+  scrollbar-color: #33343b transparent;
 }
 body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoothing: antialiased; }
 
@@ -141,10 +146,12 @@ body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoot
 }
 
 /* ---------- scrollbars ---------- */
-/* The OS bar is a bright slab on a dark panel — give scroll areas a quiet one. */
-.scroll-slim { scrollbar-width: thin; scrollbar-color: #33343b transparent; }
+/* The OS bar is a bright slab on a dark page — the whole app gets a quiet one. */
+html::-webkit-scrollbar,
 .scroll-slim::-webkit-scrollbar { width: 10px; height: 10px; }
+html::-webkit-scrollbar-track,
 .scroll-slim::-webkit-scrollbar-track { background: transparent; }
+html::-webkit-scrollbar-thumb,
 .scroll-slim::-webkit-scrollbar-thumb {
   background: #2e2f36;
   border-radius: 999px;
@@ -152,8 +159,11 @@ body { margin: 0; min-height: 100vh; background: transparent; -webkit-font-smoot
   border: 3px solid transparent;
   background-clip: content-box;
 }
+html::-webkit-scrollbar-thumb:hover,
 .scroll-slim::-webkit-scrollbar-thumb:hover { background: #3d3f48; background-clip: content-box; }
+html::-webkit-scrollbar-corner,
 .scroll-slim::-webkit-scrollbar-corner { background: transparent; }
+.scroll-slim { scrollbar-width: thin; scrollbar-color: #33343b transparent; }
 
 /* ---------- live state ---------- */
 .pulse-dot { position: relative; }

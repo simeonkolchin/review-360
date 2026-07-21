@@ -5,7 +5,7 @@ import { api, type Chat } from '../api/client'
 import { useAuth } from '../context/AuthContext'
 import BackgroundFX from './BackgroundFX'
 import Logo from './Logo'
-import { Avatar } from './ui'
+import { Avatar, ChatAvatar } from './ui'
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const { user, logout } = useAuth()
@@ -50,7 +50,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                 className={`px-3 py-1.5 rounded-lg text-[13.5px] transition flex items-center gap-1.5
                   ${!isOverview ? 'text-[var(--color-text)] bg-[var(--color-surface-2)]'
                                 : 'text-[var(--color-muted)] hover:text-[var(--color-text)]'}`}>
-                {active ? active.title : 'Команды'}
+                {active && <ChatAvatar name={active.title} url={active.photo_url} size={18} />}
+                <span className="truncate max-w-[180px]">{active ? active.title : 'Команды'}</span>
                 <ChevronDown className={`w-3.5 h-3.5 transition ${open ? 'rotate-180' : ''}`} />
               </button>
 
@@ -67,9 +68,12 @@ export default function Layout({ children }: { children: React.ReactNode }) {
                     ) : chats.map(chat => (
                       <button key={chat.id}
                         onClick={() => { setOpen(false); navigate(`/chats/${chat.id}`) }}
-                        className="w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg
+                        className="w-full flex items-center justify-between gap-2 px-2.5 py-2 rounded-lg
                                    text-left text-[13.5px] hover:bg-[var(--color-surface-2)] transition">
-                        <span className="truncate">{chat.title}</span>
+                        <span className="flex items-center gap-2.5 min-w-0">
+                          <ChatAvatar name={chat.title} url={chat.photo_url} size={24} />
+                          <span className="truncate">{chat.title}</span>
+                        </span>
                         {String(chat.id) === chatId
                           ? <Check className="w-3.5 h-3.5 text-[var(--color-accent)] shrink-0" />
                           : <span className="text-[11px] text-[var(--color-muted)] shrink-0">

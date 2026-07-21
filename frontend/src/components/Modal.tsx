@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { X } from 'lucide-react'
+import { useBodyScrollLock } from './useBodyScrollLock'
 
 /**
  * Dialog over a scrim — the dimmed, blurred layer behind a popup.
@@ -16,16 +17,13 @@ export default function Modal({
   children?: React.ReactNode
   footer?: React.ReactNode
 }) {
+  useBodyScrollLock(open)
+
   useEffect(() => {
     if (!open) return
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     document.addEventListener('keydown', onKey)
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.removeEventListener('keydown', onKey)
-      document.body.style.overflow = previous
-    }
+    return () => document.removeEventListener('keydown', onKey)
   }, [open, onClose])
 
   if (!open) return null
